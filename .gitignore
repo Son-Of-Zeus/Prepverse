@@ -118,3 +118,4 @@ coverage/
 # Claude Code
 # ========================
 .claude/
+.kotlin
