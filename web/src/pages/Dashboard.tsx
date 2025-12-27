@@ -7,9 +7,9 @@ import { getRecentPractice, SubjectProgress } from '../utils/progress';
 
 import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
 import {
-  LayoutDashboard, Target, Zap, Swords,
-  LogOut, Flame, Star, BookOpen,
-  ArrowRight, Trophy, Activity, MessageSquare
+  LayoutDashboard, Target, Zap, Swords, Users,
+  LogOut, Flame, Star, BookOpen, Clock,
+  ArrowRight, Trophy, Activity, TrendingUp, MessageSquare
 } from 'lucide-react';
 import { forumApi } from '../api/forum';
 
@@ -25,6 +25,7 @@ const SideNav = () => {
     { label: 'Start Practice', icon: Target, path: '/practice' },
     { label: 'Discussion', icon: MessageSquare, path: '/discussion' },
     { label: 'Focus Mode', icon: Zap, path: '/focus' },
+    { label: 'Peer Study', icon: Users, path: '/peer' },
     { label: 'Start Battle', icon: Swords, path: '/battle', disabled: true },
   ];
 
