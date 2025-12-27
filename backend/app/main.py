@@ -38,7 +38,7 @@ app.add_middleware(
     secret_key=settings.SESSION_SECRET_KEY,
     session_cookie="_oauth_state",  # Different from SESSION_COOKIE_NAME
     max_age=600,  # 10 min - only needed during OAuth flow
-    same_site="none",
+    same_site="lax" if settings.DEBUG else "none",
     https_only=not settings.DEBUG,  # False for local dev
 )
 
