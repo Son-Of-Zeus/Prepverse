@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LoginPage, OnboardingPage } from './pages';
+import { LoginPage, OnboardingPage, DashboardPage } from './pages';
 import { useAuth } from './hooks/useAuth';
 import './styles/globals.css';
 
@@ -54,14 +54,7 @@ function App() {
       {/* Route content */}
       {currentRoute === 'login' && <LoginPage />}
       {currentRoute === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
-      {currentRoute === 'dashboard' && (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <h1 className="font-display text-4xl text-white">Dashboard</h1>
-            <p className="text-gray-400">Coming soon...</p>
-          </div>
-        </div>
-      )}
+      {currentRoute === 'dashboard' && <DashboardPage />}
     </div>
   );
 }
