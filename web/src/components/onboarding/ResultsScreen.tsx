@@ -17,10 +17,38 @@ interface ProfileData {
   level: string;
 }
 
+interface InterruptionEvent {
+  type: 'tab_switch' | 'window_blur' | 'visibility_change';
+  timestamp: number;
+  duration?: number;
+}
+
+interface SessionTracking {
+  startTime: number | null;
+  endTime: number | null;
+  actualDuration: number;
+  totalElapsed: number;
+  interruptions: InterruptionEvent[];
+  isActive: boolean;
+  lastInterruptionStart: number | null;
+  focusStatistics?: {
+    totalFocusTime: number;
+    totalUnfocusTime: number;
+    focusPercentage: number;
+    longestFocusPeriod: number;
+    longestUnfocusPeriod: number;
+    averageFocusPeriod: number;
+    focusPeriods: number;
+    unfocusPeriods: number;
+    totalInterruptions: number;
+  };
+}
+
 interface ResultsScreenProps {
   profile: ProfileData;
   userName: string;
   onContinue: () => void;
+  sessionTracking?: SessionTracking;
 }
 
 /**
@@ -37,6 +65,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
   profile,
   userName,
   onContinue,
+  sessionTracking,
 }) => {
   const [animatedScore, setAnimatedScore] = useState(0);
   const [showDetails, setShowDetails] = useState(false);
@@ -80,6 +109,14 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
 
   const getSubjectColor = (subject: string) => {
     return subjectColors[subject.toLowerCase()] || 'bg-cosmic';
+  };
+
+  // Format duration helper
+  const formatDuration = (milliseconds: number): string => {
+    const totalSeconds = Math.round(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}m ${seconds}s`;
   };
 
   return (
@@ -215,6 +252,99 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Session Duration Stats */}
+        {showProfile && sessionTracking && sessionTracking.endTime && (
+          <div className="glass rounded-2xl p-6 opacity-0 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-cosmic/10 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-cosmic">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+              <h3 className="font-display text-xl text-white font-bold">Session Duration</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Actual Duration */}
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-electric">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span className="text-xs text-gray-400 uppercase font-mono">Active Time</span>
+                </div>
+                <p className="text-2xl font-bold text-white font-mono">
+                  {formatDuration(sessionTracking.actualDuration)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Time spent on quiz</p>
+              </div>
+
+              {/* Total Elapsed */}
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-plasma">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span className="text-xs text-gray-400 uppercase font-mono">Total Time</span>
+                </div>
+                <p className="text-2xl font-bold text-white font-mono">
+                  {formatDuration(sessionTracking.totalElapsed)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">From start to finish</p>
+              </div>
+
+              {/* Interruptions */}
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-solar">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                  <span className="text-xs text-gray-400 uppercase font-mono">Interruptions</span>
+                </div>
+                <p className="text-2xl font-bold text-white font-mono">
+                  {sessionTracking.interruptions.length}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {sessionTracking.interruptions.length > 0 
+                    ? `${formatDuration(sessionTracking.interruptions.reduce((acc, i) => acc + (i.duration || 0), 0))} total`
+                    : 'No interruptions'}
+                </p>
+              </div>
+            </div>
+
+            {/* Interruption Details */}
+            {sessionTracking.interruptions.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-white/10">
+                <h4 className="text-sm font-medium text-gray-400 mb-3 uppercase tracking-wider">Interruption Details</h4>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {sessionTracking.interruptions.map((interruption, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-solar/50" />
+                        <span className="text-gray-300 capitalize">
+                          {interruption.type.replace('_', ' ')}
+                        </span>
+                        <span className="text-gray-500 text-xs">
+                          {new Date(interruption.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      {interruption.duration && (
+                        <span className="text-gray-400 font-mono text-xs">
+                          {formatDuration(interruption.duration)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

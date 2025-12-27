@@ -8,12 +8,6 @@ interface AssessmentTimerProps {
 
 /**
  * AssessmentTimer - A dramatic, visually engaging countdown timer
- *
- * Design Philosophy:
- * - Circular progress ring with gradient stroke
- * - Digital display with monospace for precision feel
- * - Warning state when time is low (changes color, pulses)
- * - Smooth animations for the countdown
  */
 export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
   totalSeconds,
@@ -37,6 +31,7 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
           }
+
           onTimeUp();
           return 0;
         }
@@ -99,7 +94,6 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
             viewBox={`0 0 ${size} ${size}`}
             className="transform -rotate-90"
           >
-            {/* Background circle */}
             <circle
               cx={size / 2}
               cy={size / 2}
@@ -109,7 +103,6 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
               strokeWidth={strokeWidth}
             />
 
-            {/* Progress circle */}
             <circle
               cx={size / 2}
               cy={size / 2}

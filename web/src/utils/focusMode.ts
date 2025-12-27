@@ -3,7 +3,7 @@ export class FocusMode {
   private maxViolations = 3;
   private started = false;
   private active = true;
-  private isShowingModal = false; // Prevents violation loops
+  private isShowingModal = false;
   private modalId = "focus-violation-modal";
 
   private blurHandler = () => this.maybeViolation("Window lost focus");
@@ -14,25 +14,19 @@ export class FocusMode {
   private keyHandler = (e: KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey || e.altKey || ["F11", "F12", "Escape"].includes(e.key)) {
       e.preventDefault();
-      this.maybeViolation(`Blocked key: ${e.key}`);
+      this.maybeViolation(`System shortcut detected: ${e.key}`);
     }
   };
-  private resizeHandler = () => this.maybeViolation("Window resized");
+  private resizeHandler = () => this.maybeViolation("Browser window resized");
 
   constructor() {
     this.init();
   }
 
   private init() {
-    // Inject Styles once
     this.injectStyles();
+    this.showRulesIntro();
     
-    // Slight delay before monitoring starts to allow page stabilization
-    setTimeout(() => {
-      this.started = true;
-      this.enterFullscreen();
-    }, 1500);
-
     window.addEventListener("blur", this.blurHandler);
     document.addEventListener("visibilitychange", this.visHandler);
     document.addEventListener("contextmenu", this.ctxHandler);
@@ -51,52 +45,102 @@ export class FocusMode {
     const style = document.createElement('style');
     style.id = 'focus-mode-styles';
     style.innerHTML = `
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
       #${this.modalId} {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(15, 23, 42, 0.9); display: flex; align-items: center;
-        justify-content: center; z-index: 100000; font-family: 'Inter', sans-serif;
-        backdrop-filter: blur(8px);
+        background: rgba(15, 23, 42, 0.65); /* Semi-transparent Slate */
+        display: flex; align-items: center; justify-content: center;
+        z-index: 100000; font-family: 'Plus Jakarta Sans', sans-serif;
+        backdrop-filter: blur(12px); /* Glassmorphism effect */
+        -webkit-backdrop-filter: blur(12px);
       }
       .fm-content {
-        background: white; padding: 40px; border-radius: 24px;
-        text-align: center; max-width: 450px; width: 90%;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        background: rgba(255, 255, 255, 0.9); /* Transparent White */
+        padding: 40px; border-radius: 32px; text-align: center;
+        max-width: 440px; width: 90%;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        animation: fmScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       }
-      .fm-icon { font-size: 60px; margin-bottom: 20px; }
-      .fm-title { color: #1e293b; font-size: 24px; font-weight: 800; margin-bottom: 12px; }
-      .fm-msg { color: #64748b; margin-bottom: 24px; line-height: 1.6; font-size: 16px; }
+      @keyframes fmScale {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .fm-icon { font-size: 56px; margin-bottom: 20px; display: block; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+      .fm-title { color: #0f172a; font-size: 24px; font-weight: 800; margin-bottom: 12px; letter-spacing: -0.02em; }
+      .fm-msg { color: #475569; margin-bottom: 24px; line-height: 1.6; font-size: 15px; font-weight: 500; }
       .fm-btn {
-        background: #ef4444; color: white; border: none; padding: 14px 32px;
-        border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 16px;
-        transition: all 0.2s; width: 100%;
+        background: #0f172a; color: white; border: none; padding: 16px 28px;
+        border-radius: 16px; cursor: pointer; font-weight: 700; font-size: 15px;
+        transition: all 0.2s ease; width: 100%;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
       }
-      .fm-btn:hover { background: #dc2626; transform: translateY(-2px); }
+      .fm-btn:hover { background: #1e293b; transform: translateY(-2px); box-shadow: 0 8px 16px rgba(15, 23, 42, 0.3); }
+      .fm-btn-danger { background: #e11d48; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.2); }
+      .fm-btn-danger:hover { background: #be123c; box-shadow: 0 8px 16px rgba(225, 29, 72, 0.3); }
+      
       .fm-warning-box {
-        margin-top: 20px; padding: 12px; background: #fee2e2;
-        border-radius: 8px; color: #991b1b; font-weight: 600;
+        margin-top: 20px; padding: 14px; background: rgba(225, 29, 72, 0.05);
+        border-radius: 14px; color: #e11d48; font-weight: 700; font-size: 13px;
+        border: 1px solid rgba(225, 29, 72, 0.1); display: flex; align-items: center; justify-content: center; gap: 8px;
+        text-transform: uppercase; letter-spacing: 0.05em;
       }
+      .fm-rules-list { text-align: left; background: rgba(15, 23, 42, 0.03); padding: 20px; border-radius: 18px; margin-bottom: 24px; }
+      .fm-rule-item { color: #334155; font-size: 14px; margin-bottom: 10px; display: flex; gap: 12px; font-weight: 500; }
+      .fm-rule-bullet { color: #0f172a; font-weight: 800; }
     `;
     document.head.appendChild(style);
   }
 
+  private showRulesIntro() {
+    this.isShowingModal = true;
+    const modal = document.createElement('div');
+    modal.id = this.modalId;
+    modal.innerHTML = `
+      <div class="fm-content">
+        <div class="fm-icon">🛡️</div>
+        <div class="fm-title">Secure Exam Mode</div>
+        <p class="fm-msg">To ensure a fair testing environment, the following rules are active:</p>
+        <div class="fm-rules-list">
+          <div class="fm-rule-item"><span class="fm-rule-bullet">01</span> <span>Switching tabs or minimizing window is prohibited.</span></div>
+          <div class="fm-rule-item"><span class="fm-rule-bullet">02</span> <span>System shortcuts & right-clicks are disabled.</span></div>
+          <div class="fm-rule-item"><span class="fm-rule-bullet">03</span> <span>Maximum of 3 violations allowed before exit.</span></div>
+        </div>
+        <button class="fm-btn" id="fm-start">Authorize & Start</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('fm-start')?.addEventListener('click', () => {
+      this.removeModal();
+      this.enterFullscreen();
+      setTimeout(() => { 
+        this.started = true;
+        this.isShowingModal = false; 
+      }, 1000);
+    });
+  }
+
   private showModal(reason: string, isFinal: boolean) {
-    this.isShowingModal = true; // Lock monitoring
+    this.isShowingModal = true;
     this.removeModal();
 
     const modal = document.createElement('div');
     modal.id = this.modalId;
-    
     const remaining = this.maxViolations - this.violations;
     
     modal.innerHTML = `
       <div class="fm-content">
-        <div class="fm-icon">${isFinal ? '💀' : '🚫'}</div>
-        <div class="fm-title">${isFinal ? 'Exam Terminated' : 'Security Violation'}</div>
+        <div class="fm-icon">${isFinal ? '🔄' : '🚩'}</div>
+        <div class="fm-title">${isFinal ? 'Assessment Terminated' : 'Focus Violation'}</div>
         <p class="fm-msg">${reason}</p>
         ${!isFinal ? `
-          <div class="fm-warning-box">Warnings remaining: ${remaining}</div>
-          <button class="fm-btn" id="fm-continue" style="margin-top: 20px;">Return to Exam</button>
-        ` : `<div class="fm-warning-box">Exiting...</div>`}
+          <div class="fm-warning-box">
+             Attempt ${this.violations} of ${this.maxViolations}
+          </div>
+          <button class="fm-btn fm-btn-danger" id="fm-continue" style="margin-top: 24px;">I acknowledge & Return</button>
+        ` : `<div class="fm-warning-box">Returning to Dashboard...</div>`}
       </div>
     `;
 
@@ -106,8 +150,7 @@ export class FocusMode {
       document.getElementById('fm-continue')?.addEventListener('click', () => {
         this.removeModal();
         this.enterFullscreen();
-        // Delay unlocking violations to prevent immediate re-trigger
-        setTimeout(() => { this.isShowingModal = false; }, 1000);
+        setTimeout(() => { this.isShowingModal = false; }, 1200);
       });
     }
   }
@@ -134,12 +177,12 @@ export class FocusMode {
 
     if (this.violations >= this.maxViolations) {
       this.active = false;
-      this.showModal("Maximum security violations reached. You have been disqualified from this session.", true);
+      this.showModal("Critical violation limit reached. Access to this assessment has been revoked.", true);
       setTimeout(() => {
         window.location.href = "/dashboard"; 
       }, 3500);
     } else {
-      this.showModal(reason, false);
+      this.showModal(`Security Alert: ${reason}. Please maintain focus on the exam window.`, false);
     }
   }
 }

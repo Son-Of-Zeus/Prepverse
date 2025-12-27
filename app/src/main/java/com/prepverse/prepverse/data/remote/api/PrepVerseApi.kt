@@ -34,13 +34,10 @@ interface PrepVerseApi {
     // ================================
 
     /**
-     * Get 10 random onboarding questions based on class level
-     * @param classLevel The student's class (10 or 12)
+     * Get 10 random onboarding questions based on user's class level
      */
     @GET("api/v1/onboarding/questions")
-    suspend fun getOnboardingQuestions(
-        @retrofit2.http.Query("class_level") classLevel: Int
-    ): Response<List<QuestionResponse>>
+    suspend fun getOnboardingQuestions(): Response<List<QuestionResponse>>
 
     /**
      * Submit onboarding answers and get evaluation results

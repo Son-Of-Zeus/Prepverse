@@ -1,12 +1,12 @@
 """
 Onboarding assessment endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from supabase import Client
 from datetime import datetime
 
-from app.core.security import get_current_user_flexible
+from app.core.security import get_current_user
 from app.db.session import get_db
 from app.schemas.question import OnboardingQuestion, QuestionResponse
 from app.schemas.onboarding import (
@@ -21,21 +21,17 @@ router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
 @router.get("/questions", response_model=List[QuestionResponse])
 async def get_onboarding_questions(
-    class_level: int = None,
-    current_user: dict = Depends(get_current_user_flexible),
+    current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db)
 ):
     """
-    Get 10 random onboarding questions based on class level.
-
-    Args:
-        class_level: Optional class level (10 or 12). If not provided, uses user's saved class level.
+    Get 10 random onboarding questions based on user's class level
     """
     user_id = current_user["user_id"]
 
     try:
-        # Get user's data from database
-        result = db.table("users").select("id, class_level").eq("auth0_id", user_id).execute()
+        # Get user's class level
+        result = db.table("users").select("class_level").eq("auth0_id", user_id).execute()
 
         if not result.data or len(result.data) == 0:
             raise HTTPException(
@@ -43,17 +39,10 @@ async def get_onboarding_questions(
                 detail="User not found"
             )
 
-        user_data = result.data[0]
-
-        # Use provided class_level or fall back to user's saved class level
-        effective_class_level = class_level if class_level in (10, 12) else user_data["class_level"]
-
-        # If class_level was provided and differs from saved, update the user's class level
-        if class_level in (10, 12) and class_level != user_data["class_level"]:
-            db.table("users").update({"class_level": class_level}).eq("id", user_data["id"]).execute()
+        class_level = result.data[0]["class_level"]
 
         # Get random questions
-        questions = onboarding_service.get_random_questions(effective_class_level, count=10)
+        questions = onboarding_service.get_random_questions(class_level, count=10)
 
         # Convert to response format (without correct answers)
         response_questions = [
@@ -86,7 +75,7 @@ async def get_onboarding_questions(
 @router.post("/submit", response_model=OnboardingResponse)
 async def submit_onboarding_answers(
     submission: OnboardingSubmission,
-    current_user: dict = Depends(get_current_user_flexible),
+    current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db)
 ):
     """
@@ -173,7 +162,7 @@ async def submit_onboarding_answers(
 
 @router.get("/status", response_model=OnboardingStatus)
 async def get_onboarding_status(
-    current_user: dict = Depends(get_current_user_flexible),
+    current_user: dict = Depends(get_current_user),
     db: Client = Depends(get_db)
 ):
     """
