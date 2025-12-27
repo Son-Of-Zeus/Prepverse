@@ -7,8 +7,9 @@ import {
     Code, Cpu, Database, Globe,
     Layout, Server, Smartphone, Terminal,
     BookOpen, AlertCircle, Calculator, Atom,
-    ArrowRight, Clock, Layers, Sparkles, X, ChevronLeft,
-    Monitor, Box, Zap
+    ArrowRight, Clock, Layers, ChevronLeft,
+    Monitor, Box
+
 } from 'lucide-react';
 import { getProgress } from '../utils/progress';
 import { useAuth } from '../hooks/useAuth';
@@ -34,7 +35,8 @@ interface TopicsResponse {
 }
 
 interface PracticeConfig {
-    difficulty: 'easy' | 'medium' | 'hard' | null;
+    difficulty: 'easy' | 'medium' | 'hard' | 'adaptive' | null;
+
     questionCount: number | null;
     timer: string | null;
 }
@@ -221,20 +223,24 @@ const ConfigWizard = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="glass w-full max-w-2xl rounded-2xl overflow-hidden shadow-card relative animate-scale-in border border-white/10">
+            <div className="glass w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl relative animate-scale-in border border-white/10 bg-slate-900/80 backdrop-blur-2xl">
                 {/* Modal Header */}
-                <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
+                <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/5">
                     <div>
-                        <h2 className="text-xl font-display text-white flex items-center gap-2">
-                            <Sparkles size={18} className="text-solar" />
-                            Configure Session
+                        <h2 className="text-3xl font-display text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 font-bold mb-1">
+                            {topic.display_name}
                         </h2>
-                        <p className="text-sm text-gray-400 font-sans">Target: <span className="text-prepverse-red-light">{topic.display_name}</span></p>
+                        <p className="text-sm text-prepverse-red font-mono uppercase tracking-widest font-bold">Session Configuration</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
-                        <X size={20} />
+                    <button
+                        onClick={onClose}
+                        className="group flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all border border-white/5 hover:border-white/20"
+                    >
+                        <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                        <span className="text-sm font-medium">Back to Units</span>
                     </button>
                 </div>
+
 
                 {/* Progress Bar */}
                 <div className="h-1 bg-surface w-full">
@@ -247,29 +253,42 @@ const ConfigWizard = ({
                 {/* Wizard Content */}
                 <div className="p-8 min-h-[350px] flex flex-col justify-center">
                     {step === 1 && (
-                        <div className="space-y-8 animate-slide-in">
-                            <h3 className="text-center text-xl text-white font-display">Select Difficulty</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-8 animate-slide-in max-w-3xl mx-auto w-full">
+                            <div className="text-center">
+                                <h3 className="text-2xl text-white font-display mb-2">Select Challenge Level</h3>
+                                <p className="text-slate-400">Choose a difficulty that matches your current preparation.</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 {[
-                                    { id: 'easy', label: 'Easy', color: 'bg-green-500', desc: 'Warm up' },
-                                    { id: 'medium', label: 'Medium', color: 'bg-solar', desc: 'Standard' },
-                                    { id: 'hard', label: 'Hard', color: 'bg-prepverse-red', desc: 'Challenge' }
+                                    { id: 'adaptive', label: 'Adaptive', color: 'bg-indigo-500', desc: 'AI-Adjusted', icon: '🧠' },
+                                    { id: 'easy', label: 'Easy', color: 'bg-emerald-500', desc: 'Foundational', icon: '🌱' },
+                                    { id: 'medium', label: 'Medium', color: 'bg-amber-500', desc: 'Standard', icon: '⚡' },
+                                    { id: 'hard', label: 'Hard', color: 'bg-rose-500', desc: 'Advanced', icon: '🔥' }
                                 ].map((level) => (
+
                                     <button
                                         key={level.id}
                                         onClick={() => handleNext('difficulty', level.id)}
-                                        className="group relative p-6 rounded-xl border border-white/5 bg-surface hover:bg-elevated transition-all hover:-translate-y-1 hover:shadow-lg flex flex-col items-center gap-3"
+                                        className="group relative p-8 rounded-2xl border border-white/5 bg-slate-800/50 hover:bg-slate-800 transition-all hover:-translate-y-2 hover:shadow-xl flex flex-col items-center gap-4 text-center"
                                     >
-                                        <div className={`w-12 h-12 rounded-full ${level.color} bg-opacity-20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
-                                            <Zap size={20} className={level.color.replace('bg-', 'text-')} />
+                                        <div className={`w-16 h-16 rounded-2xl ${level.color} bg-opacity-20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-lg ${level.color.replace('bg-', 'shadow-')}/20`}>
+                                            <span className="text-2xl">{level.icon}</span>
                                         </div>
-                                        <span className="font-display text-lg text-white">{level.label}</span>
-                                        <span className="text-xs text-gray-500 uppercase tracking-widest">{level.desc}</span>
+                                        <div>
+                                            <span className="font-display text-xl text-white block mb-2">{level.label}</span>
+                                            <span className="text-sm text-slate-400 font-sans leading-tight block">{level.desc}</span>
+                                        </div>
+
+                                        <div className={`mt-4 w-full h-1 rounded-full bg-white/5 overflow-hidden`}>
+                                            <div className={`h-full ${level.color} w-0 group-hover:w-full transition-all duration-500`} />
+                                        </div>
                                     </button>
                                 ))}
                             </div>
                         </div>
                     )}
+
 
                     {step === 2 && (
                         <div className="space-y-8 animate-slide-in">
