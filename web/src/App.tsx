@@ -1,41 +1,21 @@
-import { useState, useEffect } from 'react';
-import { LoginPage, OnboardingPage, DashboardPage } from './pages';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, BattlePage, PracticeSelectionPage } from './pages';
 import { useAuth } from './hooks/useAuth';
 import './styles/globals.css';
-
-type AppRoute = 'login' | 'onboarding' | 'dashboard';
+import { FocusProvider, useFocus } from './contexts/FocusContext';
+import { FocusOverlay } from './components/focus/FocusOverlay';
+import { FocusViolationModal } from './components/focus/FocusViolationModal';
+import { PomodoroBreakModal } from './components/onboarding/PomodoroBreakModal';
+import { useNavigate } from 'react-router-dom';
 
 /**
- * App - Root component with simple routing for demonstration
- *
- * In production, this would use React Router for proper navigation
+ * AppContent - Inner component with routing and Focus context
  */
-function App() {
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>('login');
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const { isAuthenticated, isLoading, user } = useAuth();
-
-  // Handle authentication state changes
-  useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        // User is authenticated - check onboarding status
-        if (user?.onboarding_completed || hasCompletedOnboarding) {
-          setCurrentRoute('dashboard');
-        } else {
-          setCurrentRoute('onboarding');
-        }
-      } else {
-        // User is not authenticated, redirect to login
-        setCurrentRoute('login');
-      }
-    }
-  }, [isAuthenticated, isLoading, user, hasCompletedOnboarding]);
-
-  const handleOnboardingComplete = () => {
-    setHasCompletedOnboarding(true);
-    setCurrentRoute('dashboard');
-  };
+function AppContent() {
+  const { isAuthenticated, isLoading, user, refetchUser } = useAuth();
+  const { isActive, violations, maxViolations, resumeFromViolation, stopSession, showViolationModal, isOnBreak, skipBreak, settings } = useFocus();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -49,13 +29,143 @@ function App() {
     );
   }
 
+  const handleOnboardingComplete = () => {
+    refetchUser();
+  };
+
+  // Check if we're on the focus page
+  const isOnFocusPage = location.pathname === '/focus';
+
   return (
-    <div className="min-h-screen bg-void">
-      {/* Route content */}
-      {currentRoute === 'login' && <LoginPage />}
-      {currentRoute === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
-      {currentRoute === 'dashboard' && <DashboardPage />}
+    <div className="min-h-screen bg-void relative">
+      {/* Violation Modal - Global */}
+      {showViolationModal && (
+        <FocusViolationModal
+          violationCount={violations}
+          maxViolations={maxViolations}
+          onResume={resumeFromViolation}
+          onEndSession={stopSession}
+        />
+      )}
+
+      {/* Break Modal - Global */}
+      {isOnBreak && (
+        <PomodoroBreakModal
+          onBreakComplete={skipBreak}
+          breakMinutes={settings.breakMinutes}
+        />
+      )}
+
+      {/* Focus Overlay - Visible when active and NOT on focus page */}
+      {!isOnFocusPage && isActive && (
+        <FocusOverlay onExpand={() => navigate('/focus')} />
+      )}
+
+      {/* Routes */}
+      <Routes>
+        {/* Public Route */}
+        <Route
+          path="/login"
+          element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" />}
+        />
+
+        {/* Protected Routes */}
+        <Route
+          path="/onboarding"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <Navigate to="/dashboard" /> : <OnboardingPage onComplete={handleOnboardingComplete} />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        <Route
+          path="/dashboard"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <DashboardPage /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        <Route
+          path="/practice"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <PracticePage /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Dynamic Route for Practice Session */}
+        <Route
+          path="/practice/session/:id"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <PracticeSession /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        <Route
+          path="/practice/results"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <PracticeResults /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Focus Mode Route */}
+        <Route
+          path="/focus"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <FocusModePage onNavigateBack={() => navigate('/dashboard')} /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Battle Route */}
+        <Route
+          path="/battle"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <BattlePage onNavigateBack={() => navigate('/dashboard')} /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Practice Selection Route */}
+        <Route
+          path="/practice-selection"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <PracticeSelectionPage onNavigateBack={() => navigate('/dashboard')} /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Default Redirect */}
+        <Route
+          path="*"
+          element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />}
+        />
+      </Routes>
     </div>
+  );
+}
+
+/**
+ * App - Root component with FocusProvider and Router
+ */
+function App() {
+  return (
+    <BrowserRouter>
+      <FocusProvider>
+        <AppContent />
+      </FocusProvider>
+    </BrowserRouter>
   );
 }
 

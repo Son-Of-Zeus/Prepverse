@@ -6,10 +6,8 @@ import { QuestionCard } from '../components/onboarding/QuestionCard';
 import { AssessmentTimer } from '../components/onboarding/AssessmentTimer';
 import { ProgressIndicator, QuestionDots } from '../components/onboarding/ProgressIndicator';
 import { ResultsScreen } from '../components/onboarding/ResultsScreen';
-// Focus mode imports (from sanghu)
-import { FocusHistoryTracker, FocusStatistics } from '../utils/focusHistory';
-import { FocusModeSettings, FocusModeSettings as FocusModeSettingsType } from '../components/onboarding/FocusModeSettings';
-import { FocusModeSession } from '../components/onboarding/FocusModeSession';
+import { FocusViolationModal } from '../components/focus/FocusViolationModal';
+
 // Backend API imports (from main)
 import {
   getOnboardingQuestions,
@@ -18,6 +16,7 @@ import {
   OnboardingAnswer,
   OnboardingResponse,
 } from '../api/onboarding';
+import { useAuth } from '../hooks/useAuth';
 
 // Types for QuestionCard component (options with id/text format)
 interface Option {
@@ -51,7 +50,6 @@ interface SessionTracking {
   interruptions: InterruptionEvent[];
   isActive: boolean;
   lastInterruptionStart: number | null;
-  focusStatistics?: FocusStatistics; // Focus history statistics
 }
 
 interface OnboardingPageProps {
@@ -94,12 +92,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isTimerPaused] = useState(false);
 
-  // Focus mode settings (from sanghu)
-  const [focusModeSettings, setFocusModeSettings] = useState<FocusModeSettingsType>({
-    pomodoroMinutes: 25,
-    breakMinutes: 5,
-    enabled: false,
-  });
+
 
   // Session tracking state (from sanghu)
   const [sessionTracking, setSessionTracking] = useState<SessionTracking>({
@@ -118,15 +111,20 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
   const [evaluationResult, setEvaluationResult] = useState<OnboardingResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Proctoring state
+  const [violations, setViolations] = useState(0);
+  const [showViolationModal, setShowViolationModal] = useState(false);
+  const maxViolations = 3;
+
   // Refs for tracking (from sanghu)
   const sessionStartRef = useRef<number | null>(null);
   const lastActiveTimeRef = useRef<number | null>(null);
   const interruptionStartRef = useRef<number | null>(null);
   const durationUpdateIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const focusHistoryTrackerRef = useRef<FocusHistoryTracker | null>(null);
 
   // Mock user name - would come from auth
-  const userName = 'Student';
+  const { user } = useAuth();
+  const userName = user?.full_name?.split(' ')[0] || user?.full_name || 'Student';
 
   // Initialize session tracking when component mounts
   useEffect(() => {
@@ -167,11 +165,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     setStep('loading');
     setError(null);
 
-    // Initialize focus history tracker only if focus mode is enabled (from sanghu)
-    if (focusModeSettings.enabled && !focusHistoryTrackerRef.current) {
-      const startTime = sessionStartRef.current || Date.now();
-      focusHistoryTrackerRef.current = new FocusHistoryTracker(startTime);
-    }
+
 
     try {
       // Fetch questions from backend (from main)
@@ -233,44 +227,23 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
         ? endTime - interruptionStartRef.current
         : 0;
 
-      // Finalize focus history tracking only if focus mode was enabled
-      if (focusModeSettings.enabled && focusHistoryTrackerRef.current) {
-        focusHistoryTrackerRef.current.finalize(endTime);
-        const focusStats = focusHistoryTrackerRef.current.calculateStatistics(
+      setSessionTracking((prev) => {
+        const actualDuration = prev.actualDuration - finalInterruptionDuration;
+        return {
+          ...prev,
           endTime,
-          sessionTracking.interruptions
-        );
-
-        setSessionTracking((prev) => {
-          const actualDuration = prev.actualDuration - finalInterruptionDuration;
-          return {
-            ...prev,
-            endTime,
-            totalElapsed,
-            actualDuration: Math.max(0, actualDuration),
-            isActive: false,
-            focusStatistics: focusStats,
-          };
-        });
-      } else {
-        setSessionTracking((prev) => {
-          const actualDuration = prev.actualDuration - finalInterruptionDuration;
-          return {
-            ...prev,
-            endTime,
-            totalElapsed,
-            actualDuration: Math.max(0, actualDuration),
-            isActive: false,
-          };
-        });
-      }
+          totalElapsed,
+          actualDuration: Math.max(0, actualDuration),
+          isActive: false,
+        };
+      });
     }
 
     // Clear interval
     if (durationUpdateIntervalRef.current) {
       clearInterval(durationUpdateIntervalRef.current);
     }
-  }, [sessionTracking.interruptions, focusModeSettings.enabled]);
+  }, [sessionTracking.interruptions]);
 
   const handleNextQuestion = () => {
     if (currentQuestion < questions.length) {
@@ -291,6 +264,22 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
 
   const handleGoToDashboard = () => {
     onComplete?.();
+  };
+
+  // Proctoring handlers
+  const handleResumeFromViolation = () => {
+    setShowViolationModal(false);
+  };
+
+  const handleEndSessionFromViolation = () => {
+    // Terminated due to violations - don't save any stats, restart onboarding
+    setShowViolationModal(false);
+    setStep('class-select');
+    setCurrentQuestion(1);
+    setAnswers({});
+    setViolations(0);
+    setQuestions([]);
+    setBackendQuestions([]);
   };
 
   // Session tracking: Update actual duration periodically (from sanghu)
@@ -318,9 +307,10 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     }
   }, [sessionTracking.isActive]);
 
-  // Session tracking: Handle visibility changes (from sanghu)
+  // Session tracking & Proctoring: Handle visibility changes
   useEffect(() => {
-    if (!sessionTracking.isActive) return;
+    // Only enable proctoring during quiz step
+    if (step !== 'quiz') return;
 
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden;
@@ -328,9 +318,13 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
 
       if (!isVisible && !interruptionStartRef.current) {
         interruptionStartRef.current = now;
-        if (focusModeSettings.enabled) {
-          focusHistoryTrackerRef.current?.recordUnfocus(now);
-        }
+
+        // Proctoring: Add violation
+        setViolations((prev) => {
+          const newCount = prev + 1;
+          setShowViolationModal(true);
+          return newCount;
+        });
 
         setSessionTracking((prev) => ({
           ...prev,
@@ -347,9 +341,6 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
         const interruptionDuration = now - interruptionStartRef.current;
         interruptionStartRef.current = null;
         lastActiveTimeRef.current = now;
-        if (focusModeSettings.enabled) {
-          focusHistoryTrackerRef.current?.recordFocus(now);
-        }
 
         setSessionTracking((prev) => {
           const updatedInterruptions = [...prev.interruptions];
@@ -368,14 +359,18 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     };
 
     const handleBlur = () => {
-      if (!sessionTracking.isActive) return;
+      if (document.hidden) return; // Already handled by visibility change
       const now = Date.now();
 
       if (!interruptionStartRef.current) {
         interruptionStartRef.current = now;
-        if (focusModeSettings.enabled) {
-          focusHistoryTrackerRef.current?.recordUnfocus(now);
-        }
+
+        // Proctoring: Add violation
+        setViolations((prev) => {
+          const newCount = prev + 1;
+          setShowViolationModal(true);
+          return newCount;
+        });
 
         setSessionTracking((prev) => ({
           ...prev,
@@ -392,16 +387,12 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     };
 
     const handleFocus = () => {
-      if (!sessionTracking.isActive) return;
       const now = Date.now();
 
       if (interruptionStartRef.current) {
         const interruptionDuration = now - interruptionStartRef.current;
         interruptionStartRef.current = null;
         lastActiveTimeRef.current = now;
-        if (focusModeSettings.enabled) {
-          focusHistoryTrackerRef.current?.recordFocus(now);
-        }
 
         setSessionTracking((prev) => {
           const updatedInterruptions = [...prev.interruptions];
@@ -419,16 +410,23 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       }
     };
 
+    // Prevent right-click during quiz
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [sessionTracking.isActive, focusModeSettings.enabled]);
+  }, [step]);
 
   // Store session data to localStorage (from sanghu)
   useEffect(() => {
@@ -513,8 +511,8 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
           evaluationResult.score_percentage >= 80
             ? 'Scholar'
             : evaluationResult.score_percentage >= 50
-            ? 'Learner'
-            : 'Beginner',
+              ? 'Learner'
+              : 'Beginner',
       };
     }
 
@@ -551,10 +549,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
               <ClassSelector onSelect={handleClassSelect} selectedClass={selectedClass} />
 
               {/* Focus Mode Settings (from sanghu) */}
-              <FocusModeSettings
-                onSettingsChange={setFocusModeSettings}
-                initialSettings={focusModeSettings}
-              />
+
 
               {/* Error message (from main) */}
               {error && (
@@ -603,80 +598,87 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
           </div>
         )}
 
-        {/* Quiz with FocusModeSession wrapper (combined) */}
         {step === 'quiz' && questions.length > 0 && (
-          <FocusModeSession settings={focusModeSettings}>
-            <div className="min-h-screen flex flex-col p-4 md:p-8">
-              {/* Top bar with timer and progress */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
-                {/* Timer */}
-                <AssessmentTimer
-                  totalSeconds={600}
-                  onTimeUp={handleTimeUp}
-                  isPaused={isTimerPaused}
-                />
+          <div className="min-h-screen flex flex-col p-4 md:p-8">
+            {/* Proctoring Violation Modal */}
+            {showViolationModal && (
+              <FocusViolationModal
+                violationCount={violations}
+                maxViolations={maxViolations}
+                onResume={handleResumeFromViolation}
+                onEndSession={handleEndSessionFromViolation}
+              />
+            )}
 
-                {/* Question dots for desktop */}
-                <div className="hidden md:block">
-                  <QuestionDots
-                    current={currentQuestion}
-                    total={questions.length}
-                    answeredQuestions={answeredQuestions}
-                  />
-                </div>
+            {/* Top bar with timer and progress */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
+              {/* Timer */}
+              <AssessmentTimer
+                totalSeconds={600}
+                onTimeUp={handleTimeUp}
+                isPaused={isTimerPaused}
+              />
 
-                {/* Class badge */}
-                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
-                  <span className="font-mono text-xs text-gray-500 uppercase">Class</span>
-                  <span className="font-display font-bold text-white">{selectedClass}</span>
-                </div>
-              </div>
-
-              {/* Error message */}
-              {error && (
-                <div className="mb-4 px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
-                  {error}
-                </div>
-              )}
-
-              {/* Progress bar for mobile */}
-              <div className="md:hidden mb-8">
-                <ProgressIndicator
+              {/* Question dots for desktop */}
+              <div className="hidden md:block">
+                <QuestionDots
                   current={currentQuestion}
                   total={questions.length}
                   answeredQuestions={answeredQuestions}
                 />
               </div>
 
-              {/* Question card */}
-              <div className="flex-1 flex items-center justify-center">
-                {(() => {
-                  const currentQuestionData = questions[currentQuestion - 1];
-                  if (!currentQuestionData) return null;
-                  return (
-                    <QuestionCard
-                      question={currentQuestionData}
-                      questionNumber={currentQuestion}
-                      totalQuestions={questions.length}
-                      selectedAnswer={answers[currentQuestionData.id] || null}
-                      onSelectAnswer={handleSelectAnswer}
-                      onNext={handleNextQuestion}
-                      isLastQuestion={currentQuestion === questions.length}
-                    />
-                  );
-                })()}
-              </div>
-
-              {/* Bottom progress for desktop */}
-              <div className="hidden md:block mt-8">
-                <ProgressIndicator
-                  current={currentQuestion}
-                  total={questions.length}
-                  answeredQuestions={answeredQuestions}
-                />
+              {/* Class badge */}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+                <span className="font-mono text-xs text-gray-500 uppercase">Class</span>
+                <span className="font-display font-bold text-white">{selectedClass}</span>
               </div>
             </div>
-          </FocusModeSession>
+
+            {/* Error message */}
+            {error && (
+              <div className="mb-4 px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
+                {error}
+              </div>
+            )}
+
+            {/* Progress bar for mobile */}
+            <div className="md:hidden mb-8">
+              <ProgressIndicator
+                current={currentQuestion}
+                total={questions.length}
+                answeredQuestions={answeredQuestions}
+              />
+            </div>
+
+            {/* Question card */}
+            <div className="flex-1 flex items-center justify-center">
+              {(() => {
+                const currentQuestionData = questions[currentQuestion - 1];
+                if (!currentQuestionData) return null;
+                return (
+                  <QuestionCard
+                    question={currentQuestionData}
+                    questionNumber={currentQuestion}
+                    totalQuestions={questions.length}
+                    selectedAnswer={answers[currentQuestionData.id] || null}
+                    onSelectAnswer={handleSelectAnswer}
+                    onNext={handleNextQuestion}
+                    isLastQuestion={currentQuestion === questions.length}
+                  />
+                );
+              })()}
+            </div>
+
+            {/* Bottom progress for desktop */}
+            <div className="hidden md:block mt-8">
+              <ProgressIndicator
+                current={currentQuestion}
+                total={questions.length}
+                answeredQuestions={answeredQuestions}
+              />
+            </div>
+          </div>
         )}
 
         {step === 'results' && (
