@@ -4,17 +4,14 @@ import { CosmicBackground } from '../components/ui/CosmicBackground';
 import { useDashboard, fetchConceptMastery, fetchPerformanceTrend, ConceptMastery, RecentScore } from '../hooks/useDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { getRecentPractice, SubjectProgress } from '../utils/progress';
-import { SchoolSelector } from '../components/onboarding/SchoolSelector';
-import { getUserSchool, setUserSchool, type School } from '../api/schools';
+
 import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
 import { PerformanceTrend } from '../components/dashboard/PerformanceTrend';
 import {
   LayoutDashboard, Target, Zap, Swords,
   LogOut, Flame, Star, BookOpen, Clock,
-  ArrowRight, Trophy, Activity, TrendingUp, School as SchoolIcon
+  ArrowRight, Trophy, Activity, TrendingUp
 } from 'lucide-react';
-
-import { X } from 'lucide-react'; // Import X for close button
 
 // --- Components ---
 
@@ -192,28 +189,6 @@ export const DashboardPage: React.FC = () => {
   const [isLoadingConcepts, setIsLoadingConcepts] = useState(false);
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
 
-  // School Selection State
-  const [userSchool, setLocalUserSchool] = useState<School | null>(null);
-  const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
-  const [pendingSchool, setPendingSchool] = useState<School | null>(null);
-
-  // Fetch user school on mount
-  useEffect(() => {
-    getUserSchool().then(setLocalUserSchool).catch(console.error);
-  }, []);
-
-  const handleSchoolUpdate = async () => {
-    if (pendingSchool) {
-      try {
-        await setUserSchool(pendingSchool.id);
-        setLocalUserSchool(pendingSchool);
-        setIsSchoolModalOpen(false);
-      } catch (err) {
-        console.error('Failed to update school:', err);
-      }
-    }
-  };
-
   // Get available subjects from subjectScores
   const availableSubjects = useMemo(() => Object.keys(subjectScores), [subjectScores]);
 
@@ -279,16 +254,6 @@ export const DashboardPage: React.FC = () => {
               <p className="text-slate-400 mt-1">Ready to continue your journey?</p>
             </div>
             <div className="flex items-center gap-4">
-              {/* School Selector Button */}
-              <button
-                onClick={() => setIsSchoolModalOpen(true)}
-                className="glass px-4 py-2 rounded-xl flex items-center gap-2 border border-white/5 hover:bg-white/10 transition-colors"
-              >
-                <SchoolIcon className="text-electric" size={18} />
-                <span className="font-mono font-bold text-sm text-slate-300 max-w-[150px] truncate">
-                  {userSchool ? userSchool.name : 'Select School'}
-                </span>
-              </button>
 
               <div className="glass px-4 py-2 rounded-xl flex items-center gap-2 border border-white/5">
                 <Flame className="text-orange-500 fill-orange-500" size={18} />
@@ -451,55 +416,6 @@ export const DashboardPage: React.FC = () => {
 
         </div>
       </main>
-
-      {/* School Selection Modal */}
-      {isSchoolModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg bg-surface border border-white/10 rounded-3xl p-6 shadow-2xl relative animate-scale-in">
-            <button
-              onClick={() => setIsSchoolModalOpen(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/5"
-              type="button"
-            >
-              <X size={20} />
-            </button>
-
-            <h3 className="text-2xl font-display text-white mb-2">Select Your School</h3>
-            <p className="text-slate-400 mb-6">Find your school to connect with your community.</p>
-
-            <div className="mb-8">
-              <SchoolSelector
-                value={pendingSchool?.id || userSchool?.id || null}
-                onChange={(_, school) => setPendingSchool(school)}
-                placeholder="Search school name..."
-              />
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setIsSchoolModalOpen(false)}
-                className="px-6 py-3 rounded-xl font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSchoolUpdate}
-                disabled={!pendingSchool}
-                className={`
-                  px-6 py-3 rounded-xl font-medium text-white
-                  bg-electric hover:bg-electric/80 text-black
-                  transition-all shadow-lg shadow-electric/20
-                  disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none
-                `}
-                type="button"
-              >
-                Confirm Selection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
