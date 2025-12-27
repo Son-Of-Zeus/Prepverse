@@ -924,4 +924,85 @@ The `get_db_user_id()` function in `backend/app/core/security.py` handles both c
 
 ---
 
+### 2024-12-27 - School Selection Feature
+
+Added CBSE school selection for study battles and matchmaking.
+
+**Data Source**: [deedy/cbse_schools_data](https://github.com/deedy/cbse_schools_data) (CC-BY-SA 4.0)
+- 20,367 CBSE affiliated schools
+- Includes affiliation code, name, state, district, contact info
+
+**New Files Created**:
+
+| File | Purpose |
+|------|---------|
+| `backend/schools_schema.sql` | Schools table + school_id on users |
+| `backend/scripts/import_schools.py` | Script to import schools.csv into Supabase |
+| `backend/app/schemas/school.py` | School Pydantic schemas |
+| `backend/app/api/v1/schools.py` | School API endpoints with web frontend instructions |
+| `app/.../data/remote/api/dto/SchoolDtos.kt` | Android school DTOs |
+| `app/.../data/repository/SchoolRepository.kt` | Android school API calls |
+
+**Updated Files**:
+
+| File | Changes |
+|------|---------|
+| `backend/app/api/v1/router.py` | Added schools router |
+| `app/.../data/remote/api/PrepVerseApi.kt` | Added school endpoints |
+| `app/.../domain/model/User.kt` | Added School model, schoolId to User |
+| `app/.../ui/screens/onboarding/OnboardingViewModel.kt` | Added school search & selection |
+| `app/.../ui/screens/onboarding/OnboardingScreen.kt` | Added SchoolSelectionStep UI |
+| `app/.../ui/navigation/NavGraph.kt` | Added school callbacks |
+
+**API Endpoints** (`/api/v1/schools`):
+- `GET /search?q=&state=&limit=` - Search schools by name/code
+- `GET /states` - List states with school counts
+- `GET /{school_id}` - Get school details
+- `POST /set` - Set user's school
+- `GET /user/current` - Get current user's school
+
+**Onboarding Flow Change**:
+Welcome → Class Selection → **School Selection (new)** → Assessment → Results
+
+---
+
+### 2024-12-27 - Supabase Query Optimizations
+
+Implemented performance optimizations for Supabase queries across backend and frontend.
+
+**Backend Batch Inserts** (reduced N queries → 1 query):
+
+| File | Change |
+|------|--------|
+| `backend/app/api/v1/onboarding.py:230-243` | Batch insert `user_attempts` (was 10 separate inserts) |
+| `backend/app/services/practice_service.py:121-134` | Batch insert `practice_session_questions` |
+
+**Backend SQL Optimizations**:
+
+| File | Change |
+|------|--------|
+| `backend/app/api/v1/schools.py:236-269` | Use RPC for state aggregation (was loading 20K+ rows) |
+| `backend/app/services/practice_service.py:70-93` | Use RPC for DISTINCT subjects (was Python set()) |
+| `backend/optimized_queries.sql` | SQL functions for efficient aggregation |
+
+**New SQL Functions** (`backend/optimized_queries.sql`):
+- `get_school_states_with_counts()` - GROUP BY for state counts (~100x faster)
+- `get_distinct_subjects(class_level)` - DISTINCT for curriculum topics
+
+**Web Frontend Debouncing** (new files):
+
+| File | Purpose |
+|------|---------|
+| `web/src/hooks/useDebounce.ts` | Debounce hook + debounced callback utility |
+| `web/src/api/schools.ts` | Schools API client functions |
+| `web/src/components/onboarding/SchoolSelector.tsx` | Debounced school search autocomplete |
+
+**Performance Improvements**:
+- Onboarding submission: 10 DB calls → 1 DB call
+- Practice session start: N DB calls → 1 DB call
+- School states list: 20K+ rows loaded → single SQL GROUP BY
+- School search: Debounced with 300ms delay to prevent API spam
+
+---
+
 *Last Updated: 2024-12-27*

@@ -75,6 +75,11 @@ fun PrepVerseNavGraph(
             OnboardingScreen(
                 uiState = uiState,
                 onSelectClass = viewModel::selectClass,
+                onProceedToSchool = viewModel::proceedToSchoolSelection,
+                onSearchSchool = viewModel::searchSchools,
+                onSelectSchool = viewModel::selectSchool,
+                onClearSchool = viewModel::clearSchool,
+                onSkipSchool = viewModel::skipSchoolSelection,
                 onStartAssessment = viewModel::startAssessment,
                 onSelectAnswer = viewModel::selectAnswer,
                 onNextQuestion = viewModel::nextQuestion,
