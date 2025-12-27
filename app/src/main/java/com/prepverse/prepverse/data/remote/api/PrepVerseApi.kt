@@ -1,6 +1,7 @@
 package com.prepverse.prepverse.data.remote.api
 
 import com.prepverse.prepverse.data.remote.api.dto.ConceptProgressResponse
+import com.prepverse.prepverse.data.remote.api.dto.DashboardResponse
 import com.prepverse.prepverse.data.remote.api.dto.EndSessionRequest
 import com.prepverse.prepverse.data.remote.api.dto.EndSessionResponse
 import com.prepverse.prepverse.data.remote.api.dto.GenerateQuestionsRequest
@@ -161,6 +162,16 @@ interface PrepVerseApi {
      */
     @GET("api/v1/practice/progress/summary")
     suspend fun getProgressSummary(): Response<ProgressSummaryResponse>
+
+    // ================================
+    // Dashboard Endpoints
+    // ================================
+
+    /**
+     * Get dashboard data including performance summary, suggested topics, and streak info
+     */
+    @GET("api/v1/dashboard")
+    suspend fun getDashboard(): Response<DashboardResponse>
 
     // ================================
     // Focus Endpoints
