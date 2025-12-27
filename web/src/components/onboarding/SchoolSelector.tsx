@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useDebounce } from '@/hooks/useDebounce';
-import { searchSchools, type School } from '@/api/schools';
+import { useDebounce } from '../../hooks/useDebounce';
+import { searchSchools, type School } from '../../api/schools';
 
 interface SchoolSelectorProps {
   value: string | null;
