@@ -3,10 +3,13 @@ package com.prepverse.prepverse.ui.screens.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.prepverse.prepverse.data.remote.api.dto.QuestionResponse
+import com.prepverse.prepverse.data.remote.api.dto.SchoolResult
 import com.prepverse.prepverse.data.repository.OnboardingRepository
+import com.prepverse.prepverse.data.repository.SchoolRepository
 import com.prepverse.prepverse.domain.model.Difficulty
 import com.prepverse.prepverse.domain.model.OnboardingQuestion
 import com.prepverse.prepverse.domain.model.QuestionAttempt
+import com.prepverse.prepverse.domain.model.School
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,6 +24,12 @@ import javax.inject.Inject
 data class OnboardingUiState(
     val step: OnboardingStep = OnboardingStep.WELCOME,
     val selectedClass: Int? = null,
+    // School selection
+    val selectedSchool: School? = null,
+    val schoolSearchQuery: String = "",
+    val schoolSearchResults: List<School> = emptyList(),
+    val isSearchingSchools: Boolean = false,
+    // Assessment
     val questions: List<OnboardingQuestion> = emptyList(),
     val currentQuestionIndex: Int = 0,
     val selectedAnswer: String? = null,
@@ -28,6 +37,7 @@ data class OnboardingUiState(
     val timeRemainingSeconds: Int = 600, // 10 minutes
     val isLoading: Boolean = false,
     val error: String? = null,
+    // Results
     val score: Int = 0,
     val scorePercentage: Float = 0f,
     val strengths: List<String> = emptyList(),
@@ -38,19 +48,22 @@ data class OnboardingUiState(
 enum class OnboardingStep {
     WELCOME,
     CLASS_SELECTION,
+    SCHOOL_SELECTION,  // New step for school selection
     ASSESSMENT,
     RESULTS
 }
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
-    private val onboardingRepository: OnboardingRepository
+    private val onboardingRepository: OnboardingRepository,
+    private val schoolRepository: SchoolRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
+    private var searchJob: Job? = null
     private var questionStartTime: Long = 0
 
     // Store raw API questions for submission
@@ -63,6 +76,110 @@ class OnboardingViewModel @Inject constructor(
                 step = OnboardingStep.CLASS_SELECTION
             )
         }
+    }
+
+    /**
+     * Proceed from class selection to school selection
+     */
+    fun proceedToSchoolSelection() {
+        _uiState.update {
+            it.copy(step = OnboardingStep.SCHOOL_SELECTION)
+        }
+    }
+
+    /**
+     * Search for schools with debouncing
+     */
+    fun searchSchools(query: String) {
+        _uiState.update { it.copy(schoolSearchQuery = query) }
+
+        // Cancel previous search
+        searchJob?.cancel()
+
+        // Don't search if query is too short
+        if (query.length < 2) {
+            _uiState.update {
+                it.copy(
+                    schoolSearchResults = emptyList(),
+                    isSearchingSchools = false
+                )
+            }
+            return
+        }
+
+        // Debounce search
+        searchJob = viewModelScope.launch {
+            delay(300) // 300ms debounce
+
+            _uiState.update { it.copy(isSearchingSchools = true) }
+
+            schoolRepository.searchSchools(query)
+                .onSuccess { response ->
+                    val schools = response.results.map { it.toDomainModel() }
+                    _uiState.update {
+                        it.copy(
+                            schoolSearchResults = schools,
+                            isSearchingSchools = false
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    Timber.e(error, "School search failed")
+                    _uiState.update {
+                        it.copy(
+                            schoolSearchResults = emptyList(),
+                            isSearchingSchools = false,
+                            error = "Failed to search schools: ${error.message}"
+                        )
+                    }
+                }
+        }
+    }
+
+    /**
+     * Select a school
+     */
+    fun selectSchool(school: School) {
+        _uiState.update {
+            it.copy(
+                selectedSchool = school,
+                schoolSearchQuery = school.name,
+                schoolSearchResults = emptyList()
+            )
+        }
+    }
+
+    /**
+     * Clear selected school
+     */
+    fun clearSchool() {
+        _uiState.update {
+            it.copy(
+                selectedSchool = null,
+                schoolSearchQuery = ""
+            )
+        }
+    }
+
+    /**
+     * Skip school selection (optional)
+     */
+    fun skipSchoolSelection() {
+        startAssessment()
+    }
+
+    /**
+     * Convert API SchoolResult to domain School
+     */
+    private fun SchoolResult.toDomainModel(): School {
+        return School(
+            id = id,
+            affiliationCode = affiliationCode,
+            name = name,
+            state = state,
+            district = district,
+            displayName = displayName
+        )
     }
 
     fun startAssessment() {
@@ -217,6 +334,18 @@ class OnboardingViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
+
+            // If a school was selected, save it first
+            state.selectedSchool?.let { school ->
+                schoolRepository.setUserSchool(school.id)
+                    .onSuccess {
+                        Timber.d("School saved: ${school.name}")
+                    }
+                    .onFailure { error ->
+                        Timber.e(error, "Failed to save school, continuing with onboarding")
+                        // Don't fail onboarding if school save fails
+                    }
+            }
 
             // Build answers list from attempts
             val answers = state.answers.mapIndexed { index, attempt ->
@@ -447,5 +576,6 @@ class OnboardingViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         timerJob?.cancel()
+        searchJob?.cancel()
     }
 }

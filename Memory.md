@@ -924,4 +924,46 @@ The `get_db_user_id()` function in `backend/app/core/security.py` handles both c
 
 ---
 
+### 2024-12-27 - School Selection Feature
+
+Added CBSE school selection for study battles and matchmaking.
+
+**Data Source**: [deedy/cbse_schools_data](https://github.com/deedy/cbse_schools_data) (CC-BY-SA 4.0)
+- 20,367 CBSE affiliated schools
+- Includes affiliation code, name, state, district, contact info
+
+**New Files Created**:
+
+| File | Purpose |
+|------|---------|
+| `backend/schools_schema.sql` | Schools table + school_id on users |
+| `backend/scripts/import_schools.py` | Script to import schools.csv into Supabase |
+| `backend/app/schemas/school.py` | School Pydantic schemas |
+| `backend/app/api/v1/schools.py` | School API endpoints with web frontend instructions |
+| `app/.../data/remote/api/dto/SchoolDtos.kt` | Android school DTOs |
+| `app/.../data/repository/SchoolRepository.kt` | Android school API calls |
+
+**Updated Files**:
+
+| File | Changes |
+|------|---------|
+| `backend/app/api/v1/router.py` | Added schools router |
+| `app/.../data/remote/api/PrepVerseApi.kt` | Added school endpoints |
+| `app/.../domain/model/User.kt` | Added School model, schoolId to User |
+| `app/.../ui/screens/onboarding/OnboardingViewModel.kt` | Added school search & selection |
+| `app/.../ui/screens/onboarding/OnboardingScreen.kt` | Added SchoolSelectionStep UI |
+| `app/.../ui/navigation/NavGraph.kt` | Added school callbacks |
+
+**API Endpoints** (`/api/v1/schools`):
+- `GET /search?q=&state=&limit=` - Search schools by name/code
+- `GET /states` - List states with school counts
+- `GET /{school_id}` - Get school details
+- `POST /set` - Set user's school
+- `GET /user/current` - Get current user's school
+
+**Onboarding Flow Change**:
+Welcome → Class Selection → **School Selection (new)** → Assessment → Results
+
+---
+
 *Last Updated: 2024-12-27*

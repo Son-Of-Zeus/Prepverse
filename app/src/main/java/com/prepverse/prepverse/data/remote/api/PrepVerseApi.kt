@@ -12,9 +12,15 @@ import com.prepverse.prepverse.data.remote.api.dto.OnboardingStatusResponse
 import com.prepverse.prepverse.data.remote.api.dto.OnboardingSubmission
 import com.prepverse.prepverse.data.remote.api.dto.ProgressSummaryResponse
 import com.prepverse.prepverse.data.remote.api.dto.QuestionResponse
+import com.prepverse.prepverse.data.remote.api.dto.SchoolDetailsResponse
+import com.prepverse.prepverse.data.remote.api.dto.SchoolResult
+import com.prepverse.prepverse.data.remote.api.dto.SchoolSearchResponse
 import com.prepverse.prepverse.data.remote.api.dto.SessionHistoryResponse
+import com.prepverse.prepverse.data.remote.api.dto.SetSchoolRequest
+import com.prepverse.prepverse.data.remote.api.dto.SetSchoolResponse
 import com.prepverse.prepverse.data.remote.api.dto.StartSessionRequest
 import com.prepverse.prepverse.data.remote.api.dto.StartSessionResponse
+import com.prepverse.prepverse.data.remote.api.dto.StateListResponse
 import com.prepverse.prepverse.data.remote.api.dto.SubmitAnswerRequest
 import com.prepverse.prepverse.data.remote.api.dto.SubmitAnswerResponse
 import com.prepverse.prepverse.data.remote.api.dto.TopicsResponse
@@ -172,6 +178,51 @@ interface PrepVerseApi {
      */
     @GET("api/v1/dashboard")
     suspend fun getDashboard(): Response<DashboardResponse>
+
+    // ================================
+    // Schools Endpoints
+    // ================================
+
+    /**
+     * Search for schools by name or affiliation code
+     * @param query Search query (min 2 chars)
+     * @param state Optional state filter
+     * @param limit Max results (default 20)
+     */
+    @GET("api/v1/schools/search")
+    suspend fun searchSchools(
+        @Query("q") query: String,
+        @Query("state") state: String? = null,
+        @Query("limit") limit: Int = 20
+    ): Response<SchoolSearchResponse>
+
+    /**
+     * Get list of all states with school counts
+     */
+    @GET("api/v1/schools/states")
+    suspend fun getStates(): Response<StateListResponse>
+
+    /**
+     * Get details for a specific school
+     */
+    @GET("api/v1/schools/{schoolId}")
+    suspend fun getSchool(
+        @Path("schoolId") schoolId: String
+    ): Response<SchoolDetailsResponse>
+
+    /**
+     * Set the current user's school
+     */
+    @POST("api/v1/schools/set")
+    suspend fun setUserSchool(
+        @Body request: SetSchoolRequest
+    ): Response<SetSchoolResponse>
+
+    /**
+     * Get the current user's school
+     */
+    @GET("api/v1/schools/user/current")
+    suspend fun getUserSchool(): Response<SchoolResult?>
 
     // ================================
     // Focus Endpoints

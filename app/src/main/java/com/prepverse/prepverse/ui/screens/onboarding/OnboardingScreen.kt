@@ -7,11 +7,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.prepverse.prepverse.domain.model.Difficulty
 import com.prepverse.prepverse.domain.model.OnboardingQuestion
+import com.prepverse.prepverse.domain.model.School
 import com.prepverse.prepverse.ui.theme.*
 import kotlin.random.Random
 
@@ -38,6 +45,11 @@ import kotlin.random.Random
 fun OnboardingScreen(
     uiState: OnboardingUiState,
     onSelectClass: (Int) -> Unit,
+    onProceedToSchool: () -> Unit,
+    onSearchSchool: (String) -> Unit,
+    onSelectSchool: (com.prepverse.prepverse.domain.model.School) -> Unit,
+    onClearSchool: () -> Unit,
+    onSkipSchool: () -> Unit,
     onStartAssessment: () -> Unit,
     onSelectAnswer: (String) -> Unit,
     onNextQuestion: () -> Unit,
@@ -61,7 +73,18 @@ fun OnboardingScreen(
             OnboardingStep.CLASS_SELECTION -> ClassSelectionStep(
                 selectedClass = uiState.selectedClass,
                 onSelectClass = onSelectClass,
-                onStart = onStartAssessment
+                onProceed = onProceedToSchool
+            )
+            OnboardingStep.SCHOOL_SELECTION -> SchoolSelectionStep(
+                searchQuery = uiState.schoolSearchQuery,
+                searchResults = uiState.schoolSearchResults,
+                selectedSchool = uiState.selectedSchool,
+                isSearching = uiState.isSearchingSchools,
+                onSearchChange = onSearchSchool,
+                onSelectSchool = onSelectSchool,
+                onClearSchool = onClearSchool,
+                onContinue = onStartAssessment,
+                onSkip = onSkipSchool
             )
             OnboardingStep.ASSESSMENT -> {
                 // Wrap assessment in focus protection
@@ -178,7 +201,7 @@ private fun WelcomeStep(onSelectClass: (Int) -> Unit) {
 private fun ClassSelectionStep(
     selectedClass: Int?,
     onSelectClass: (Int) -> Unit,
-    onStart: () -> Unit
+    onProceed: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -222,7 +245,7 @@ private fun ClassSelectionStep(
         Spacer(modifier = Modifier.height(48.dp))
 
         Button(
-            onClick = onStart,
+            onClick = onProceed,
             enabled = selectedClass != null,
             modifier = Modifier
                 .fillMaxWidth()
@@ -235,7 +258,7 @@ private fun ClassSelectionStep(
             shape = RoundedCornerShape(16.dp)
         ) {
             Text(
-                text = "Start Assessment",
+                text = "Continue",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
@@ -244,10 +267,357 @@ private fun ClassSelectionStep(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "10 questions • ~10 minutes",
+            text = "Next: Select your school",
             style = MaterialTheme.typography.bodySmall,
             color = TextMuted
         )
+    }
+}
+
+@Composable
+private fun SchoolSelectionStep(
+    searchQuery: String,
+    searchResults: List<School>,
+    selectedSchool: School?,
+    isSearching: Boolean,
+    onSearchChange: (String) -> Unit,
+    onSelectSchool: (School) -> Unit,
+    onClearSchool: () -> Unit,
+    onContinue: () -> Unit,
+    onSkip: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+        // Header
+        Text(
+            text = "Select Your School",
+            style = MaterialTheme.typography.headlineMedium,
+            color = TextPrimary,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Find your CBSE affiliated school for study battles",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Search field
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Surface),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = TextMuted,
+                    modifier = Modifier.size(24.dp)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Box(modifier = Modifier.weight(1f)) {
+                    if (searchQuery.isEmpty()) {
+                        Text(
+                            text = "Search by school name or affiliation code...",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextMuted
+                        )
+                    }
+
+                    BasicTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchChange,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = TextPrimary),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onSearchChange("") },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Clear",
+                            tint = TextMuted
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Selected school card (if any)
+        if (selectedSchool != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = ElectricCyan.copy(alpha = 0.1f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .background(ElectricCyan.copy(alpha = 0.2f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.School,
+                            contentDescription = null,
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selectedSchool.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (selectedSchool.district != null || selectedSchool.state != null) {
+                            Text(
+                                text = listOfNotNull(
+                                    selectedSchool.district,
+                                    selectedSchool.state
+                                ).joinToString(", "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onClearSchool) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Remove",
+                            tint = TextMuted
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // Search results
+        if (selectedSchool == null) {
+            when {
+                isSearching -> {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = PrepVerseRed,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
+                searchQuery.length >= 2 && searchResults.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Outlined.School,
+                                contentDescription = null,
+                                tint = TextMuted,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No schools found",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary
+                            )
+                            Text(
+                                text = "Try a different search term",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        }
+                    }
+                }
+
+                searchResults.isNotEmpty() -> {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(searchResults) { school ->
+                            SchoolResultCard(
+                                school = school,
+                                onClick = { onSelectSchool(school) }
+                            )
+                        }
+                    }
+                }
+
+                else -> {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Outlined.School,
+                                contentDescription = null,
+                                tint = TextMuted.copy(alpha = 0.5f),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Start typing to search",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary
+                            )
+                            Text(
+                                text = "Search 20,000+ CBSE schools",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        // Bottom buttons
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = onContinue,
+            enabled = selectedSchool != null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = PrepVerseRed,
+                disabledContainerColor = PrepVerseRed.copy(alpha = 0.3f)
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Text(
+                text = "Continue to Assessment",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        TextButton(
+            onClick = onSkip,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Skip for now",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextMuted
+            )
+        }
+    }
+}
+
+@Composable
+private fun SchoolResultCard(
+    school: School,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(SurfaceVariant, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.School,
+                    contentDescription = null,
+                    tint = TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = school.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Medium
+                )
+                Row {
+                    if (school.district != null || school.state != null) {
+                        Text(
+                            text = listOfNotNull(
+                                school.district,
+                                school.state
+                            ).joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                }
+                Text(
+                    text = "Code: ${school.affiliationCode}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextMuted
+                )
+            }
+        }
     }
 }
 
