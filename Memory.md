@@ -1005,4 +1005,67 @@ Implemented performance optimizations for Supabase queries across backend and fr
 
 ---
 
+### 2024-12-27 - Peer Mentoring Implementation (Android)
+
+Implemented peer mentoring feature for study collaboration between classmates.
+
+**New Android Files Created**:
+
+| File | Purpose |
+|------|---------|
+| `data/realtime/SupabaseRealtimeManager.kt` | Supabase Realtime for messages, presence, WebRTC signaling |
+| `data/webrtc/VoiceCallManager.kt` | WebRTC voice calls with multi-peer support |
+| `data/local/EncryptionManager.kt` | AES-256-CBC message encryption |
+| `data/repository/PeerRepository.kt` | Peer API calls and DTO mapping |
+| `data/remote/api/dto/PeerDtos.kt` | All peer-related DTOs |
+| `domain/model/Peer.kt` | Domain models (PeerSession, Participant, ChatMessage, WhiteboardOperation) |
+| `ui/screens/peer/PeerLobbyScreen.kt` | Study room listing and creation |
+| `ui/screens/peer/PeerLobbyViewModel.kt` | Room management state |
+| `ui/screens/peer/PeerDiscoveryScreen.kt` | Find available peers by topic |
+| `ui/screens/peer/PeerDiscoveryViewModel.kt` | Peer discovery state |
+| `ui/screens/peer/StudyRoomScreen.kt` | Active study room with chat |
+| `ui/screens/peer/StudyRoomViewModel.kt` | Chat and realtime message handling |
+| `ui/screens/peer/WhiteboardScreen.kt` | Collaborative drawing canvas |
+| `ui/screens/peer/WhiteboardViewModel.kt` | Whiteboard state and CRDT sync |
+
+**Updated Files**:
+
+| File | Changes |
+|------|---------|
+| `app/build.gradle.kts` | Added WebRTC dependency (`io.getstream:stream-webrtc-android:1.1.1`) |
+| `data/remote/api/PrepVerseApi.kt` | Added 15+ peer endpoints |
+| `ui/navigation/Routes.kt` | Added PeerLobby, PeerDiscovery, StudyRoom routes |
+| `ui/navigation/NavGraph.kt` | Wired peer navigation |
+
+**API Endpoints** (in PrepVerseApi.kt):
+- Encryption: `POST /peer/keys/register`, `GET /peer/keys/{userId}`
+- Sessions: `POST/GET /peer/sessions`, `POST /sessions/{id}/join|leave`
+- Messaging: `POST /peer/messages`, `GET /peer/messages/{sessionId}`
+- Availability: `POST /peer/availability`, `GET /peer/available`
+- Discovery: `POST /peer/find-by-topic`
+- Safety: `POST /peer/block|report`, `DELETE /peer/block/{userId}`
+- Whiteboard: `POST /peer/whiteboard/sync`, `GET /peer/whiteboard/{sessionId}`
+
+**Features Implemented**:
+- Study rooms (2-4 students, same school/class only)
+- Real-time chat with AES-256-CBC encryption
+- Peer discovery with topic-based matching
+- Availability status with strong/seeking help topics
+- Block/report functionality
+- Collaborative whiteboard with drawing tools
+- WebRTC voice call infrastructure (signaling ready)
+- Supabase Realtime for presence and messaging
+
+**WebRTC Signaling** (via SupabaseRealtimeManager):
+- `sendWebRTCSignal()` broadcasts offer/answer/ICE candidates
+- `webrtcSignalFlow` receives signals targeted to user
+- Full mesh topology support for multi-peer calls
+
+**Build Configuration**:
+- `gradle.properties` configured with JDK 17 path for Kotlin 2.0 compatibility
+- `org.gradle.java.home=/Library/Java/JavaVirtualMachines/openlogic-openjdk-17.jdk/Contents/Home`
+- Build verified: `./gradlew assembleDebug` successful
+
+---
+
 *Last Updated: 2024-12-27*

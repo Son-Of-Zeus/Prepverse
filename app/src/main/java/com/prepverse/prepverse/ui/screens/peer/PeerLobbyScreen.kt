@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter
 fun PeerLobbyScreen(
     onNavigateToSession: (String) -> Unit,
     onNavigateBack: () -> Unit,
+    onNavigateToPeerDiscovery: () -> Unit = {},
     viewModel: PeerLobbyViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -55,6 +56,9 @@ fun PeerLobbyScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToPeerDiscovery) {
+                        Icon(Icons.Default.Person, "Find Peers")
+                    }
                     IconButton(onClick = { viewModel.loadSessions() }) {
                         Icon(Icons.Default.Refresh, "Refresh")
                     }

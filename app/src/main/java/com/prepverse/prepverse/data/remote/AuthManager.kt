@@ -53,8 +53,11 @@ class AuthManager @Inject constructor(
     fun loginWithGoogle(activityContext: Context) {
         _authState.value = AuthState.Loading
 
-        // Build the backend login URL with platform=android
-        val loginUrl = "${BuildConfig.API_BASE_URL}/api/v1/auth/login?platform=android"
+        // Build the backend login URL with platform=android and api_base_url
+        // The api_base_url tells the backend where to redirect after Auth0 authentication
+        // This is crucial for physical device testing where the IP differs from emulator
+        val encodedBaseUrl = java.net.URLEncoder.encode(BuildConfig.API_BASE_URL, "UTF-8")
+        val loginUrl = "${BuildConfig.API_BASE_URL}/api/v1/auth/login?platform=android&api_base_url=$encodedBaseUrl"
 
         Timber.d("Opening login URL: $loginUrl")
 

@@ -3,6 +3,7 @@ package com.prepverse.prepverse.ui.screens.peer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -17,13 +18,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.prepverse.prepverse.domain.model.Point
 import com.prepverse.prepverse.domain.model.WhiteboardOperation
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Whiteboard Canvas for collaborative drawing.
@@ -39,108 +39,219 @@ fun WhiteboardCanvas(
     modifier: Modifier = Modifier
 ) {
     var currentPath by remember { mutableStateOf<MutableList<Point>>(mutableListOf()) }
-    var currentUserId by remember { mutableStateOf("current-user") } // Get from auth
+    var currentUserId by remember { mutableStateOf("current-user") }
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .pointerInput(currentTool) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        when (currentTool) {
-                            WhiteboardTool.DRAW, WhiteboardTool.ERASE -> {
-                                currentPath = mutableListOf(
-                                    Point(offset.x, offset.y)
-                                )
-                            }
-                            else -> {}
-                        }
-                    },
-                    onDrag = { change, _ ->
-                        when (currentTool) {
-                            WhiteboardTool.DRAW, WhiteboardTool.ERASE -> {
-                                currentPath.add(Point(change.position.x, change.position.y))
-                            }
-                            else -> {}
-                        }
-                    },
-                    onDragEnd = {
-                        when (currentTool) {
-                            WhiteboardTool.DRAW -> {
-                                if (currentPath.isNotEmpty()) {
-                                    val operation = WhiteboardOperation.Draw(
-                                        id = java.util.UUID.randomUUID().toString(),
-                                        userId = currentUserId,
-                                        timestamp = System.currentTimeMillis(),
-                                        points = currentPath.toList(),
-                                        color = currentColor.toArgb(),
-                                        strokeWidth = currentStrokeWidth
-                                    )
-                                    onOperationAdded(operation)
-                                    currentPath = mutableListOf()
-                                }
-                            }
-                            WhiteboardTool.ERASE -> {
-                                // Simplified erase: find operations to remove
-                                // In real implementation, would check intersection
-                                currentPath = mutableListOf()
-                            }
-                            else -> {}
+    // Text input dialog state
+    var showTextDialog by remember { mutableStateOf(false) }
+    var textPosition by remember { mutableStateOf(Point(0f, 0f)) }
+    var textInput by remember { mutableStateOf("") }
+
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .pointerInput(currentTool) {
+                    if (currentTool == WhiteboardTool.TEXT) {
+                        detectTapGestures { offset ->
+                            textPosition = Point(offset.x, offset.y)
+                            textInput = ""
+                            showTextDialog = true
                         }
                     }
-                )
-            }
-    ) {
-        // Draw all completed operations
-        operations.forEach { operation ->
-            when (operation) {
-                is WhiteboardOperation.Draw -> {
-                    if (operation.points.size >= 2) {
-                        val path = Path()
-                        path.moveTo(operation.points[0].x, operation.points[0].y)
-                        for (i in 1 until operation.points.size) {
-                            path.lineTo(operation.points[i].x, operation.points[i].y)
-                        }
-                        drawPath(
-                            path = path,
-                            color = Color(operation.color),
-                            style = Stroke(
-                                width = operation.strokeWidth,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
+                }
+                .pointerInput(currentTool) {
+                    if (currentTool != WhiteboardTool.TEXT) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                when (currentTool) {
+                                    WhiteboardTool.DRAW, WhiteboardTool.ERASE -> {
+                                        currentPath = mutableListOf(
+                                            Point(offset.x, offset.y)
+                                        )
+                                    }
+                                    else -> {}
+                                }
+                            },
+                            onDrag = { change, _ ->
+                                when (currentTool) {
+                                    WhiteboardTool.DRAW, WhiteboardTool.ERASE -> {
+                                        currentPath.add(Point(change.position.x, change.position.y))
+                                    }
+                                    else -> {}
+                                }
+                            },
+                            onDragEnd = {
+                                when (currentTool) {
+                                    WhiteboardTool.DRAW -> {
+                                        if (currentPath.isNotEmpty()) {
+                                            val operation = WhiteboardOperation.Draw(
+                                                id = java.util.UUID.randomUUID().toString(),
+                                                userId = currentUserId,
+                                                timestamp = System.currentTimeMillis(),
+                                                points = currentPath.toList(),
+                                                color = currentColor.toArgb(),
+                                                strokeWidth = currentStrokeWidth
+                                            )
+                                            onOperationAdded(operation)
+                                            currentPath = mutableListOf()
+                                        }
+                                    }
+                                    WhiteboardTool.ERASE -> {
+                                        if (currentPath.isNotEmpty()) {
+                                            val erasePath = currentPath.toList()
+                                            val targetIds = operations
+                                                .filterIsInstance<WhiteboardOperation.Draw>()
+                                                .filter { drawOp ->
+                                                    erasePath.any { erasePoint ->
+                                                        drawOp.points.any { drawPoint ->
+                                                            val dx = erasePoint.x - drawPoint.x
+                                                            val dy = erasePoint.y - drawPoint.y
+                                                            (dx * dx + dy * dy) < 900f
+                                                        }
+                                                    }
+                                                }
+                                                .map { it.id }
+
+                                            // Also check text operations
+                                            val textTargetIds = operations
+                                                .filterIsInstance<WhiteboardOperation.Text>()
+                                                .filter { textOp ->
+                                                    erasePath.any { erasePoint ->
+                                                        val dx = erasePoint.x - textOp.position.x
+                                                        val dy = erasePoint.y - textOp.position.y
+                                                        (dx * dx + dy * dy) < 2500f // Larger threshold for text
+                                                    }
+                                                }
+                                                .map { it.id }
+
+                                            val allTargetIds = targetIds + textTargetIds
+                                            if (allTargetIds.isNotEmpty()) {
+                                                val eraseOp = WhiteboardOperation.Erase(
+                                                    id = java.util.UUID.randomUUID().toString(),
+                                                    userId = currentUserId,
+                                                    timestamp = System.currentTimeMillis(),
+                                                    targetIds = allTargetIds
+                                                )
+                                                onOperationAdded(eraseOp)
+                                            }
+                                        }
+                                        currentPath = mutableListOf()
+                                    }
+                                    else -> {}
+                                }
+                            }
                         )
                     }
                 }
-                is WhiteboardOperation.Text -> {
-                    // Text rendering would require more complex setup
-                    // For now, just show a placeholder
+        ) {
+            // Draw all completed operations
+            operations.forEach { operation ->
+                when (operation) {
+                    is WhiteboardOperation.Draw -> {
+                        if (operation.points.size >= 2) {
+                            val path = Path()
+                            path.moveTo(operation.points[0].x, operation.points[0].y)
+                            for (i in 1 until operation.points.size) {
+                                path.lineTo(operation.points[i].x, operation.points[i].y)
+                            }
+                            drawPath(
+                                path = path,
+                                color = Color(operation.color),
+                                style = Stroke(
+                                    width = operation.strokeWidth,
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round
+                                )
+                            )
+                        }
+                    }
+                    is WhiteboardOperation.Text -> {
+                        // Draw text using native canvas
+                        drawContext.canvas.nativeCanvas.apply {
+                            val paint = android.graphics.Paint().apply {
+                                color = operation.color
+                                textSize = operation.fontSize * 3 // Scale up for visibility
+                                isAntiAlias = true
+                            }
+                            drawText(
+                                operation.text,
+                                operation.position.x,
+                                operation.position.y,
+                                paint
+                            )
+                        }
+                    }
+                    is WhiteboardOperation.Erase -> {
+                        // Erase operations are handled by removing other operations
+                    }
+                    is WhiteboardOperation.Clear -> {
+                        // Clear operations reset the canvas
+                    }
                 }
-                is WhiteboardOperation.Erase -> {
-                    // Erase operations are handled by removing other operations
+            }
+
+            // Draw current path being drawn
+            if (currentPath.size >= 2 && currentTool == WhiteboardTool.DRAW) {
+                val path = Path()
+                path.moveTo(currentPath[0].x, currentPath[0].y)
+                for (i in 1 until currentPath.size) {
+                    path.lineTo(currentPath[i].x, currentPath[i].y)
                 }
-                is WhiteboardOperation.Clear -> {
-                    // Clear operations reset the canvas
-                }
+                drawPath(
+                    path = path,
+                    color = currentColor,
+                    style = Stroke(
+                        width = currentStrokeWidth,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
             }
         }
 
-        // Draw current path being drawn
-        if (currentPath.size >= 2 && currentTool == WhiteboardTool.DRAW) {
-            val path = Path()
-            path.moveTo(currentPath[0].x, currentPath[0].y)
-            for (i in 1 until currentPath.size) {
-                path.lineTo(currentPath[i].x, currentPath[i].y)
-            }
-            drawPath(
-                path = path,
-                color = currentColor,
-                style = Stroke(
-                    width = currentStrokeWidth,
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round
-                )
+        // Text input dialog
+        if (showTextDialog) {
+            AlertDialog(
+                onDismissRequest = { showTextDialog = false },
+                title = { Text("Add Text") },
+                text = {
+                    OutlinedTextField(
+                        value = textInput,
+                        onValueChange = { textInput = it },
+                        label = { Text("Enter text") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (textInput.isNotBlank()) {
+                                val textOp = WhiteboardOperation.Text(
+                                    id = java.util.UUID.randomUUID().toString(),
+                                    userId = currentUserId,
+                                    timestamp = System.currentTimeMillis(),
+                                    text = textInput,
+                                    position = textPosition,
+                                    fontSize = 16f,
+                                    color = currentColor.toArgb()
+                                )
+                                onOperationAdded(textOp)
+                            }
+                            showTextDialog = false
+                            textInput = ""
+                        },
+                        enabled = textInput.isNotBlank()
+                    ) {
+                        Text("Add")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showTextDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
             )
         }
     }
@@ -166,7 +277,7 @@ fun WhiteboardControls(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Tool selection
-        WhiteboardTool.values().forEach { tool ->
+        WhiteboardTool.entries.forEach { tool ->
             IconButton(
                 onClick = { onToolChanged(tool) },
                 modifier = Modifier
@@ -183,14 +294,14 @@ fun WhiteboardControls(
                     imageVector = when (tool) {
                         WhiteboardTool.DRAW -> Icons.Default.Edit
                         WhiteboardTool.ERASE -> Icons.Default.Clear
-                        WhiteboardTool.TEXT -> Icons.Default.Favorite // Using placeholder icon
+                        WhiteboardTool.TEXT -> Icons.Default.TextFields
                     },
                     contentDescription = tool.name
                 )
             }
         }
 
-        Divider(
+        HorizontalDivider(
             modifier = Modifier
                 .width(1.dp)
                 .height(32.dp)
@@ -219,13 +330,13 @@ fun WhiteboardControls(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Stroke width
+        // Stroke width indicator
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Warning, // Using as placeholder
+                imageVector = Icons.Default.LineWeight,
                 contentDescription = "Stroke Width",
                 modifier = Modifier.size(16.dp)
             )
@@ -286,7 +397,6 @@ fun CollaborativeWhiteboardScreen(
             currentStrokeWidth = currentStrokeWidth,
             onOperationAdded = { operation ->
                 operations = operations + operation
-                // TODO: Sync to server and broadcast via Supabase Realtime
             },
             modifier = Modifier.weight(1f)
         )

@@ -180,14 +180,27 @@ fun PrepVerseNavGraph(
                 onNavigateToSession = { sessionId ->
                     navController.navigate(Routes.StudyRoom.createRoute(sessionId))
                 },
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPeerDiscovery = {
+                    navController.navigate(Routes.PeerDiscovery.route)
+                }
+            )
+        }
+
+        composable(Routes.PeerDiscovery.route) {
+            com.prepverse.prepverse.ui.screens.peer.PeerDiscoveryScreen(
+                onNavigateToSession = { sessionId ->
+                    navController.navigate(Routes.StudyRoom.createRoute(sessionId))
+                },
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
         composable(
             route = Routes.StudyRoom.route,
-            arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
-        ) {
+            arguments = listOf(navArgument("roomId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            // Pass sessionId to ViewModel via SavedStateHandle
             com.prepverse.prepverse.ui.screens.peer.StudyRoomScreen(
                 onNavigateBack = { navController.popBackStack() }
             )

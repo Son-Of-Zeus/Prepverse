@@ -399,43 +399,48 @@ private fun ParticipantItem(participant: Participant) {
 }
 
 @Composable
-private fun WhiteboardView(modifier: Modifier = Modifier) {
-    // Use the actual whiteboard canvas
-    var currentTool by remember { mutableStateOf(WhiteboardTool.DRAW) }
-    var currentColor by remember { mutableStateOf(androidx.compose.ui.graphics.Color.Black) }
-    var currentStrokeWidth by remember { mutableStateOf(5f) }
-    var operations by remember { mutableStateOf<List<com.prepverse.prepverse.domain.model.WhiteboardOperation>>(emptyList()) }
+private fun WhiteboardView(
+    modifier: Modifier = Modifier,
+    viewModel: WhiteboardViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
 
     Column(modifier = modifier) {
         WhiteboardControls(
-            currentTool = currentTool,
-            currentColor = currentColor,
-            currentStrokeWidth = currentStrokeWidth,
-            onToolChanged = { currentTool = it },
-            onColorChanged = { currentColor = it },
-            onStrokeWidthChanged = { currentStrokeWidth = it },
-            onClear = {
-                val clearOp = com.prepverse.prepverse.domain.model.WhiteboardOperation.Clear(
-                    id = java.util.UUID.randomUUID().toString(),
-                    userId = "current-user",
-                    timestamp = System.currentTimeMillis()
-                )
-                operations = listOf(clearOp)
-            },
+            currentTool = uiState.currentTool,
+            currentColor = uiState.currentColor,
+            currentStrokeWidth = uiState.currentStrokeWidth,
+            onToolChanged = { viewModel.setTool(it) },
+            onColorChanged = { viewModel.setColor(it) },
+            onStrokeWidthChanged = { viewModel.setStrokeWidth(it) },
+            onClear = { viewModel.clearCanvas() },
             modifier = Modifier.fillMaxWidth()
         )
 
         WhiteboardCanvas(
-            operations = operations,
-            currentTool = currentTool,
-            currentColor = currentColor,
-            currentStrokeWidth = currentStrokeWidth,
+            operations = uiState.operations,
+            currentTool = uiState.currentTool,
+            currentColor = uiState.currentColor,
+            currentStrokeWidth = uiState.currentStrokeWidth,
             onOperationAdded = { operation ->
-                operations = operations + operation
-                // TODO: Sync to server
+                viewModel.addOperation(operation)
             },
             modifier = Modifier.weight(1f)
         )
+
+        // Show loading or error states
+        if (uiState.isLoading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
+        uiState.error?.let { error ->
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(8.dp)
+            )
+        }
     }
 }
 

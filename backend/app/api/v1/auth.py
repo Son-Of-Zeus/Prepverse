@@ -18,12 +18,14 @@ settings = get_settings()
 
 
 @router.get("/login")
-async def login(request: Request, platform: str = "web"):
+async def login(request: Request, platform: str = "web", api_base_url: str = None):
     """
     Initiate OAuth flow - redirects to Auth0 with Google connection.
 
     Args:
         platform: "web" (default) or "android" - determines callback behavior
+        api_base_url: For Android, the base URL the app is using (e.g., http://172.31.98.79:8000)
+                      This is needed because physical devices use different IPs than emulators.
     """
     # Store platform in session for callback to retrieve
     request.session["oauth_platform"] = platform
@@ -31,9 +33,15 @@ async def login(request: Request, platform: str = "web"):
     # Determine callback URL based on platform and environment
     if settings.DEBUG:
         if platform == "android":
-            # Android emulator: use direct backend URL (127.0.0.1 = host's localhost)
-            # This URL must be registered in Auth0 allowed callbacks
-            redirect_uri = "http://127.0.0.1:8000/api/v1/auth/callback"
+            # Android: use the API base URL passed by the app
+            # This handles both emulator (10.0.2.2) and physical device (local IP) cases
+            if api_base_url:
+                redirect_uri = f"{api_base_url}/api/v1/auth/callback"
+            else:
+                # Fallback for older clients: use request host
+                host = request.headers.get("host", "127.0.0.1:8000")
+                scheme = "http"  # Debug mode is always HTTP
+                redirect_uri = f"{scheme}://{host}/api/v1/auth/callback"
         else:
             # Web: requests come through Vite proxy, use frontend URL
             redirect_uri = f"{settings.FRONTEND_URL}/api/v1/auth/callback"

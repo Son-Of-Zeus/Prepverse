@@ -22,6 +22,7 @@ sealed class Routes(val route: String) {
     data object FocusMode : Routes("focus")
     data object Progress : Routes("progress")
     data object PeerLobby : Routes("peer")
+    data object PeerDiscovery : Routes("peer_discovery")
     data object StudyRoom : Routes("study_room/{roomId}") {
         fun createRoute(roomId: String) = "study_room/$roomId"
     }
