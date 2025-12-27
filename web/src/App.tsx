@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, BattlePage, PracticeSelectionPage } from './pages';
+import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, BattlePage, PracticeSelectionPage, PeerLobby, StudyRoom } from './pages';
 import { useAuth } from './hooks/useAuth';
 import './styles/globals.css';
 import { FocusProvider, useFocus } from './contexts/FocusContext';
@@ -142,6 +142,25 @@ function AppContent() {
           element={
             isAuthenticated
               ? (user?.onboarding_completed ? <PracticeSelectionPage onNavigateBack={() => navigate('/dashboard')} /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Peer Study Routes */}
+        <Route
+          path="/peer"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <PeerLobby /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        <Route
+          path="/study-room/:sessionId"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <StudyRoom /> : <Navigate to="/onboarding" />)
               : <Navigate to="/login" />
           }
         />

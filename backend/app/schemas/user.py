@@ -41,6 +41,7 @@ class UserProfile(BaseModel):
     email: str
     full_name: Optional[str]
     class_level: int
+    school_id: Optional[str] = None
     onboarding_completed: bool
     total_questions_attempted: int = 0
     correct_answers: int = 0

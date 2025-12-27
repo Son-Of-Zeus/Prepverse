@@ -249,6 +249,7 @@ async def get_current_user_profile(
             email=user_data["email"],
             full_name=user_data.get("full_name"),
             class_level=user_data["class_level"],
+            school_id=user_data.get("school_id"),
             onboarding_completed=user_data["onboarding_completed"],
             total_questions_attempted=total_attempts,
             correct_answers=correct_attempts,

@@ -7,7 +7,7 @@ import { getRecentPractice, SubjectProgress } from '../utils/progress';
 import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
 import { PerformanceTrend } from '../components/dashboard/PerformanceTrend';
 import {
-  LayoutDashboard, Target, Zap, Swords,
+  LayoutDashboard, Target, Zap, Swords, Users,
   LogOut, Flame, Star, BookOpen, Clock,
   ArrowRight, Trophy, Activity, TrendingUp
 } from 'lucide-react';
@@ -23,6 +23,7 @@ const SideNav = () => {
     { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Start Practice', icon: Target, path: '/practice' },
     { label: 'Focus Mode', icon: Zap, path: '/focus' },
+    { label: 'Peer Study', icon: Users, path: '/peer' },
     { label: 'Start Battle', icon: Swords, path: '/battle', disabled: true },
   ];
 

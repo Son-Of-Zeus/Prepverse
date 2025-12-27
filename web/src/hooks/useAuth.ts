@@ -9,6 +9,7 @@ export interface User {
   email: string;
   full_name?: string;
   class_level: number;
+  school_id?: string | null;
   onboarding_completed: boolean;
   total_questions_attempted: number;
   correct_answers: number;

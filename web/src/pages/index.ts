@@ -8,3 +8,5 @@ export { PracticeResults } from './PracticeResults';
 export { FocusModePage } from './FocusMode';
 export { BattlePage } from './Battle';
 export { PracticeSelectionPage } from './PracticeSelection';
+export { PeerLobby } from './PeerLobby';
+export { StudyRoom } from './StudyRoom';

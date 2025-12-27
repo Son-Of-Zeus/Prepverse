@@ -6,6 +6,8 @@ import com.prepverse.prepverse.data.repository.PeerRepository
 import com.prepverse.prepverse.domain.model.AvailablePeer
 import com.prepverse.prepverse.domain.model.PeerSession
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +22,13 @@ class PeerLobbyViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(PeerLobbyUiState())
     val uiState: StateFlow<PeerLobbyUiState> = _uiState.asStateFlow()
+
+    // Debounce job for search
+    private var searchJob: Job? = null
+
+    companion object {
+        private const val SEARCH_DEBOUNCE_MS = 300L
+    }
 
     init {
         loadSessions()
@@ -67,11 +76,20 @@ class PeerLobbyViewModel @Inject constructor(
 
     fun searchByTopic(topic: String) {
         _uiState.update { it.copy(searchTopic = topic) }
+
+        // Cancel any pending search
+        searchJob?.cancel()
+
+        // Only search if topic is empty (reset) or has at least 2 characters
         if (topic.length >= 2 || topic.isEmpty()) {
-            loadSessions(
-                topic = topic.ifEmpty { null },
-                subject = _uiState.value.selectedSubject
-            )
+            searchJob = viewModelScope.launch {
+                // Debounce: wait before executing search
+                delay(SEARCH_DEBOUNCE_MS)
+                loadSessions(
+                    topic = topic.ifEmpty { null },
+                    subject = _uiState.value.selectedSubject
+                )
+            }
         }
     }
 

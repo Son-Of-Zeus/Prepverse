@@ -186,6 +186,7 @@ async def list_sessions(
     ).eq("id", str(user_id)).single().execute()
 
     user = user_result.data
+
     if not user.get("school_id"):
         return []
 
@@ -224,6 +225,42 @@ async def list_sessions(
 
     return sessions
 
+@router.get("/sessions/{session_id}", response_model=SessionResponse)
+async def get_session(
+    session_id: UUID,
+    current_user: dict = Depends(get_current_user_flexible),
+    db = Depends(get_db)
+):
+    """
+    Get a specific session by ID.
+    """
+    # Get session
+    result = db.table("peer_sessions").select(
+        "*, peer_session_participants(count)"
+    ).eq("id", str(session_id)).single().execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    s = result.data
+    participant_count = s.get("peer_session_participants", [{}])[0].get("count", 0)
+
+    return SessionResponse(
+        id=s["id"],
+        name=s["name"],
+        topic=s["topic"],
+        subject=s["subject"],
+        school_id=s["school_id"],
+        class_level=s["class_level"],
+        max_participants=s["max_participants"],
+        is_voice_enabled=s["is_voice_enabled"],
+        is_whiteboard_enabled=s["is_whiteboard_enabled"],
+        status=s["status"],
+        created_by=s["created_by"],
+        created_at=s["created_at"],
+        participant_count=participant_count,
+    )
+
 @router.post("/sessions/{session_id}/join")
 async def join_session(
     session_id: UUID,
@@ -237,10 +274,10 @@ async def join_session(
     session_result = db.table("peer_sessions").select("*").eq(
         "id", str(session_id)
     ).single().execute()
-    
+
     if not session_result.data:
         raise HTTPException(status_code=404, detail="Session not found")
-        
+
     session = session_result.data
 
     user = db.table("users").select(
@@ -254,6 +291,31 @@ async def join_session(
             detail="You can only join rooms from your school and class"
         )
 
+    # Don't allow joining closed sessions
+    if session["status"] == "closed":
+        raise HTTPException(
+            status_code=400,
+            detail="This study room has ended"
+        )
+
+    # Check if user is already a participant
+    existing_participant = db.table("peer_session_participants").select(
+        "id, left_at"
+    ).eq("session_id", str(session_id)).eq("user_id", str(user_id)).execute()
+
+    if existing_participant.data:
+        participant = existing_participant.data[0]
+        if participant["left_at"] is None:
+            # Already an active participant, just return success
+            return {"status": "already_joined", "session_id": str(session_id)}
+        else:
+            # User left before, rejoin by clearing left_at
+            db.table("peer_session_participants").update({
+                "left_at": None,
+                "joined_at": "now()"
+            }).eq("id", participant["id"]).execute()
+            return {"status": "rejoined", "session_id": str(session_id)}
+
     # Check if room is full
     participants = db.table("peer_session_participants").select(
         "id, user_id"
@@ -265,21 +327,28 @@ async def join_session(
     # Check if user is blocked by any participant
     participant_ids = [p["user_id"] for p in participants.data]
     if participant_ids:
-        # We need a more complex query or multiple queries to check blocks efficiently.
-        # For now, let's just make sure the user isn't blocked by any current participant
-        # and doesn't block any current participant.
-        blocks = db.table("user_blocks").select("*").or_(
-            f"blocker_id.eq.{user_id},blocked_id.in.({','.join(participant_ids)}),"
-            f"blocked_id.eq.{user_id},blocker_id.in.({','.join(participant_ids)})"
-        ).execute()
+        try:
+            # Check if user blocks or is blocked by any current participant
+            blocked_by = db.table("user_blocks").select("id").in_(
+                "blocker_id", participant_ids
+            ).eq("blocked_id", str(user_id)).limit(1).execute()
 
-        if blocks.data:
-           raise HTTPException(
-                status_code=403,
-                detail="Cannot join this room due to user blocks"
-            )
+            blocking = db.table("user_blocks").select("id").eq(
+                "blocker_id", str(user_id)
+            ).in_("blocked_id", participant_ids).limit(1).execute()
 
-    # Add participant
+            if blocked_by.data or blocking.data:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cannot join this room due to user blocks"
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            # If user_blocks table doesn't exist or query fails, continue anyway
+            pass
+
+    # Add new participant
     db.table("peer_session_participants").insert({
         "session_id": str(session_id),
         "user_id": str(user_id),
@@ -319,7 +388,7 @@ async def leave_session(
     ).execute()
 
     if not active.data:
-        # Close the session
+        # Close the session when everyone leaves
         db.table("peer_sessions").update({
             "status": "closed",
             "closed_at": "now()",
