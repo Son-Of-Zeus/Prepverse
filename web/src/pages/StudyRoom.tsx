@@ -57,12 +57,14 @@ export function StudyRoom() {
 
   // Set current user and join session
   useEffect(() => {
+    // Don't rejoin if we intentionally left
+    if (intentionalLeaveRef.current) return;
     // Need user info
     if (!user?.id || !user?.full_name) return;
     // Need session ID
     if (!sessionId) return;
-    // Already joined in this render cycle
-    if (hasJoinedRef.current && currentSession?.id === sessionId) return;
+    // Already joined this session
+    if (hasJoinedRef.current) return;
     // Currently joining
     if (isJoiningRef.current) return;
 

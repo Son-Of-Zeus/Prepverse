@@ -112,6 +112,8 @@ export function usePeer() {
     const { currentSession, realtimeChannel } = usePeerStore.getState();
     if (!currentSession) return;
 
+    const sessionId = currentSession.id;
+
     try {
       // Untrack presence and unsubscribe from channel
       if (realtimeChannel) {
@@ -124,10 +126,12 @@ export function usePeer() {
         store.setRealtimeChannel(null);
       }
 
-      // Call API to leave (don't block on this)
-      peerApi.leaveSession(currentSession.id).catch((e) => {
+      // Call API to leave - await to ensure it completes before navigation
+      try {
+        await peerApi.leaveSession(sessionId);
+      } catch (e) {
         console.warn('Failed to notify server of leave:', e);
-      });
+      }
     } catch (error) {
       console.error('Error during leave session cleanup:', error);
     } finally {

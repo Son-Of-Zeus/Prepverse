@@ -191,9 +191,9 @@ async def list_sessions(
         return []
 
     # Query sessions from same school and class
-    query = db.table("peer_sessions").select(
-        "*, peer_session_participants(count)"
-    ).eq("school_id", user["school_id"]).eq(
+    query = db.table("peer_sessions").select("*").eq(
+        "school_id", user["school_id"]
+    ).eq(
         "class_level", user["class_level"]
     ).in_("status", ["waiting", "active"])
 
@@ -206,7 +206,12 @@ async def list_sessions(
 
     sessions = []
     for s in result.data:
-        participant_count = s.get("peer_session_participants", [{}])[0].get("count", 0)
+        # Get active participant count (only those who haven't left)
+        participant_result = db.table("peer_session_participants").select(
+            "id", count="exact"
+        ).eq("session_id", s["id"]).is_("left_at", "null").execute()
+        participant_count = participant_result.count or 0
+
         sessions.append(SessionResponse(
             id=s["id"],
             name=s["name"],
@@ -235,15 +240,20 @@ async def get_session(
     Get a specific session by ID.
     """
     # Get session
-    result = db.table("peer_sessions").select(
-        "*, peer_session_participants(count)"
-    ).eq("id", str(session_id)).single().execute()
+    result = db.table("peer_sessions").select("*").eq(
+        "id", str(session_id)
+    ).single().execute()
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Session not found")
 
     s = result.data
-    participant_count = s.get("peer_session_participants", [{}])[0].get("count", 0)
+
+    # Get active participant count (only those who haven't left)
+    participant_result = db.table("peer_session_participants").select(
+        "id", count="exact"
+    ).eq("session_id", str(session_id)).is_("left_at", "null").execute()
+    participant_count = participant_result.count or 0
 
     return SessionResponse(
         id=s["id"],
@@ -310,9 +320,11 @@ async def join_session(
             return {"status": "already_joined", "session_id": str(session_id)}
         else:
             # User left before, rejoin by clearing left_at
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc).isoformat()
             db.table("peer_session_participants").update({
                 "left_at": None,
-                "joined_at": "now()"
+                "joined_at": now
             }).eq("id", participant["id"]).execute()
             return {"status": "rejoined", "session_id": str(session_id)}
 
@@ -357,9 +369,11 @@ async def join_session(
 
     # Update session status to active if it was waiting
     if session["status"] == "waiting":
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
         db.table("peer_sessions").update({
             "status": "active",
-            "started_at": "now()",
+            "started_at": now,
         }).eq("id", str(session_id)).execute()
 
     return {"status": "joined", "session_id": str(session_id)}
@@ -371,16 +385,19 @@ async def leave_session(
     db = Depends(get_db)
 ):
     """Leave a study room."""
-    user_id = await get_db_user_id(current_user, db)
+    from datetime import datetime, timezone
 
-    # Update participant record
+    user_id = await get_db_user_id(current_user, db)
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Update participant record with actual timestamp
     db.table("peer_session_participants").update({
-        "left_at": "now()"
+        "left_at": now
     }).eq("session_id", str(session_id)).eq(
         "user_id", str(user_id)
-    ).execute()
+    ).is_("left_at", "null").execute()
 
-    # Check if room is now empty
+    # Check if room is now empty (left_at is NULL means still active)
     active = db.table("peer_session_participants").select(
         "id"
     ).eq("session_id", str(session_id)).is_(
@@ -391,7 +408,7 @@ async def leave_session(
         # Close the session when everyone leaves
         db.table("peer_sessions").update({
             "status": "closed",
-            "closed_at": "now()",
+            "closed_at": now,
         }).eq("id", str(session_id)).execute()
 
     return {"status": "left", "session_id": str(session_id)}
