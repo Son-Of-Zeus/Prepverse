@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, ArrowRight, Star } from 'lucide-react';
+import { Trophy, ArrowRight } from 'lucide-react';
 
 interface CelebrationModalProps {
     isOpen: boolean;

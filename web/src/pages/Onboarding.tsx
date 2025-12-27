@@ -6,7 +6,7 @@ import { QuestionCard } from '../components/onboarding/QuestionCard';
 import { AssessmentTimer } from '../components/onboarding/AssessmentTimer';
 import { ProgressIndicator, QuestionDots } from '../components/onboarding/ProgressIndicator';
 import { ResultsScreen } from '../components/onboarding/ResultsScreen';
-// Focus mode imports (from sanghu)
+import { FocusViolationModal } from '../components/focus/FocusViolationModal';
 
 // Backend API imports (from main)
 import {
@@ -110,6 +110,11 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
   const [questions, setQuestions] = useState<Question[]>([]);
   const [evaluationResult, setEvaluationResult] = useState<OnboardingResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Proctoring state
+  const [violations, setViolations] = useState(0);
+  const [showViolationModal, setShowViolationModal] = useState(false);
+  const maxViolations = 3;
 
   // Refs for tracking (from sanghu)
   const sessionStartRef = useRef<number | null>(null);
@@ -261,6 +266,22 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     onComplete?.();
   };
 
+  // Proctoring handlers
+  const handleResumeFromViolation = () => {
+    setShowViolationModal(false);
+  };
+
+  const handleEndSessionFromViolation = () => {
+    // Terminated due to violations - don't save any stats, restart onboarding
+    setShowViolationModal(false);
+    setStep('class-select');
+    setCurrentQuestion(1);
+    setAnswers({});
+    setViolations(0);
+    setQuestions([]);
+    setBackendQuestions([]);
+  };
+
   // Session tracking: Update actual duration periodically (from sanghu)
   useEffect(() => {
     if (sessionTracking.isActive && !interruptionStartRef.current) {
@@ -286,9 +307,10 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     }
   }, [sessionTracking.isActive]);
 
-  // Session tracking: Handle visibility changes (from sanghu)
+  // Session tracking & Proctoring: Handle visibility changes
   useEffect(() => {
-    if (!sessionTracking.isActive) return;
+    // Only enable proctoring during quiz step
+    if (step !== 'quiz') return;
 
     const handleVisibilityChange = () => {
       const isVisible = !document.hidden;
@@ -297,6 +319,12 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       if (!isVisible && !interruptionStartRef.current) {
         interruptionStartRef.current = now;
 
+        // Proctoring: Add violation
+        setViolations((prev) => {
+          const newCount = prev + 1;
+          setShowViolationModal(true);
+          return newCount;
+        });
 
         setSessionTracking((prev) => ({
           ...prev,
@@ -313,7 +341,6 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
         const interruptionDuration = now - interruptionStartRef.current;
         interruptionStartRef.current = null;
         lastActiveTimeRef.current = now;
-
 
         setSessionTracking((prev) => {
           const updatedInterruptions = [...prev.interruptions];
@@ -332,12 +359,18 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     };
 
     const handleBlur = () => {
-      if (!sessionTracking.isActive) return;
+      if (document.hidden) return; // Already handled by visibility change
       const now = Date.now();
 
       if (!interruptionStartRef.current) {
         interruptionStartRef.current = now;
 
+        // Proctoring: Add violation
+        setViolations((prev) => {
+          const newCount = prev + 1;
+          setShowViolationModal(true);
+          return newCount;
+        });
 
         setSessionTracking((prev) => ({
           ...prev,
@@ -354,14 +387,12 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     };
 
     const handleFocus = () => {
-      if (!sessionTracking.isActive) return;
       const now = Date.now();
 
       if (interruptionStartRef.current) {
         const interruptionDuration = now - interruptionStartRef.current;
         interruptionStartRef.current = null;
         lastActiveTimeRef.current = now;
-
 
         setSessionTracking((prev) => {
           const updatedInterruptions = [...prev.interruptions];
@@ -379,16 +410,23 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       }
     };
 
+    // Prevent right-click during quiz
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [sessionTracking.isActive]);
+  }, [step]);
 
   // Store session data to localStorage (from sanghu)
   useEffect(() => {
@@ -562,6 +600,16 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
 
         {step === 'quiz' && questions.length > 0 && (
           <div className="min-h-screen flex flex-col p-4 md:p-8">
+            {/* Proctoring Violation Modal */}
+            {showViolationModal && (
+              <FocusViolationModal
+                violationCount={violations}
+                maxViolations={maxViolations}
+                onResume={handleResumeFromViolation}
+                onEndSession={handleEndSessionFromViolation}
+              />
+            )}
+
             {/* Top bar with timer and progress */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
               {/* Timer */}

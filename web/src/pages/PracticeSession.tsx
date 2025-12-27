@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
 import { AlertCircle, CheckCircle2, Clock, ShieldAlert, X } from 'lucide-react';
+import { FocusViolationModal } from '../components/focus/FocusViolationModal';
 
 import { StartSessionResponse, NextQuestionResponse, QuestionForSession, SubmitAnswerResponse, SessionResult } from '../types/practice';
 import { saveProgress, getProgress } from '../utils/progress';
@@ -101,6 +102,13 @@ export const PracticeSession = () => {
     const [feedback, setFeedback] = useState<{ isCorrect: boolean; correct: string; explanation: string } | null>(null);
     const [timeRemaining, setTimeRemaining] = useState<number>(0);
 
+    // Proctoring State
+    const [violations, setViolations] = useState(0);
+    const [showViolationModal, setShowViolationModal] = useState(false);
+    const [showPreSessionWarning, setShowPreSessionWarning] = useState(true);
+    const maxViolations = 3;
+    const interruptionStartRef = useRef<number | null>(null);
+
 
     // Title Effect
     useEffect(() => {
@@ -110,12 +118,15 @@ export const PracticeSession = () => {
         return () => { document.title = 'PrepVerse'; };
     }, [state]);
 
-    // Start Session
+    // Start Session (only after warning is acknowledged)
     useEffect(() => {
         if (!state?.config || !state?.topic) {
             navigate('/practice');
             return;
         }
+
+        // Don't start until warning is dismissed
+        if (showPreSessionWarning) return;
 
         const initSession = async () => {
             // Avoid double init
@@ -158,7 +169,7 @@ export const PracticeSession = () => {
 
         if (!sessionId) initSession();
 
-    }, [state, navigate]);
+    }, [state, navigate, showPreSessionWarning]);
 
     const fetchNextQuestion = async (sid: string) => {
         try {
@@ -293,7 +304,140 @@ export const PracticeSession = () => {
         }
     };
 
+    // Proctoring handlers
+    const handleResumeFromViolation = () => {
+        setShowViolationModal(false);
+    };
+
+    const handleEndSessionFromViolation = () => {
+        // Terminated due to violations - don't save any stats, just exit
+        setShowViolationModal(false);
+        navigate('/practice');
+    };
+
+    // Proctoring: Monitor tab switching & window blur
+    useEffect(() => {
+        if (!sessionId || loading || showViolationModal) return;
+
+        const handleVisibilityChange = () => {
+            if (document.hidden && !interruptionStartRef.current) {
+                interruptionStartRef.current = Date.now();
+                setViolations((prev) => {
+                    const newCount = prev + 1;
+                    setShowViolationModal(true);
+                    return newCount;
+                });
+            } else if (!document.hidden && interruptionStartRef.current) {
+                interruptionStartRef.current = null;
+            }
+        };
+
+        const handleBlur = () => {
+            if (document.hidden) return;
+            if (!interruptionStartRef.current) {
+                interruptionStartRef.current = Date.now();
+                setViolations((prev) => {
+                    const newCount = prev + 1;
+                    setShowViolationModal(true);
+                    return newCount;
+                });
+            }
+        };
+
+        const handleFocus = () => {
+            if (interruptionStartRef.current) {
+                interruptionStartRef.current = null;
+            }
+        };
+
+        // Prevent right-click
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleBlur);
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('contextmenu', handleContextMenu);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('blur', handleBlur);
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('contextmenu', handleContextMenu);
+        };
+    }, [sessionId, loading, showViolationModal]);
+
     // --- Render Logic ---
+
+    // Pre-Session Warning
+    if (showPreSessionWarning) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center font-sans p-4">
+                <CosmicBackground starCount={40} />
+                <div className="relative z-10 w-full max-w-lg">
+                    <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-8 shadow-2xl">
+                        {/* Icon */}
+                        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                            <ShieldAlert size={40} className="text-amber-500" />
+                        </div>
+
+                        <h2 className="text-2xl font-display font-bold text-white text-center mb-4">
+                            Focus Mode Active
+                        </h2>
+
+                        <div className="space-y-4 mb-8">
+                            <p className="text-gray-400 text-center leading-relaxed">
+                                This session is proctored. Please stay focused on this window.
+                            </p>
+
+                            <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <X size={14} className="text-red-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-300">
+                                        <span className="font-semibold text-white">Don't switch tabs</span> - Changing tabs or windows will count as a violation
+                                    </p>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <X size={14} className="text-red-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-300">
+                                        <span className="font-semibold text-white">Don't minimize</span> - Minimizing the browser will also be detected
+                                    </p>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                        <AlertCircle size={14} className="text-amber-400" />
+                                    </div>
+                                    <p className="text-sm text-gray-300">
+                                        <span className="font-semibold text-white">3 violations = termination</span> - Session ends with no progress saved
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => navigate('/practice')}
+                                className="flex-1 py-3 border border-slate-600 text-slate-300 font-medium rounded-xl hover:bg-slate-800 transition-colors"
+                            >
+                                Go Back
+                            </button>
+                            <button
+                                onClick={() => setShowPreSessionWarning(false)}
+                                className="flex-1 py-3 bg-prepverse-red text-white font-bold rounded-xl hover:bg-prepverse-red/90 transition-colors shadow-lg shadow-prepverse-red/20"
+                            >
+                                I Understand
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     // Safety Loading State
     if (loading && !currentQ) {
@@ -339,6 +483,16 @@ export const PracticeSession = () => {
     return (
         <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-prepverse-red/30 overflow-hidden flex flex-col">
             <CosmicBackground starCount={40} showGrid={false} />
+
+            {/* Proctoring Violation Modal */}
+            {showViolationModal && (
+                <FocusViolationModal
+                    violationCount={violations}
+                    maxViolations={maxViolations}
+                    onResume={handleResumeFromViolation}
+                    onEndSession={handleEndSessionFromViolation}
+                />
+            )}
 
             {/* Top Progress Bar */}
             <div className="fixed top-0 left-0 right-0 h-1 bg-slate-900 z-50">

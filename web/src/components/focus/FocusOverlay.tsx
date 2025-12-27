@@ -22,8 +22,8 @@ export const FocusOverlay: React.FC<FocusOverlayProps> = ({ onExpand }) => {
     const offset = circumference - (progress / 100) * circumference;
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 animate-fade-in shadow-glow-lg">
-            <div className="bg-surface/90 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4 shadow-2xl">
+        <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
+            <div className="bg-surface/95 backdrop-blur-xl rounded-2xl p-4 flex items-center gap-4 shadow-2xl">
 
                 {/* Timer Circle */}
                 <div className="relative w-10 h-10 flex items-center justify-center cursor-pointer" onClick={onExpand}>
@@ -76,7 +76,7 @@ export const FocusOverlay: React.FC<FocusOverlayProps> = ({ onExpand }) => {
                 </div>
 
                 {/* Expand Button */}
-                <button onClick={onExpand} className="absolute -top-2 -right-2 w-6 h-6 bg-surface border border-white/10 rounded-full flex items-center justify-center text-xs text-gray-400 hover:text-white hover:border-white/30 transition-all">
+                <button onClick={onExpand} className="absolute -top-2 -right-2 w-6 h-6 bg-slate-800 rounded-full flex items-center justify-center text-xs text-gray-400 hover:text-white hover:bg-slate-700 transition-all shadow-lg">
                     ⤢
                 </button>
             </div>

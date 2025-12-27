@@ -26,11 +26,16 @@ export const FocusViolationModal: React.FC<FocusViolationModalProps> = ({
         setTimeout(onResume, 300); // Wait for transition
     };
 
+    const handleExit = () => {
+        setIsVisible(false);
+        setTimeout(onEndSession, 300);
+    };
+
     return (
         <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 transition-all duration-300 ${isVisible ? 'bg-black/80 backdrop-blur-sm' : 'bg-transparent pointer-events-none'}`}>
             <div
                 className={`
-           w-full max-w-md bg-[#0F1116] border border-red-500/20 rounded-2xl p-8 
+           w-full max-w-md bg-[#0F1116] border border-red-500/20 rounded-2xl p-8
            shadow-[0_0_50px_rgba(229,57,53,0.15)] transform transition-all duration-300
            ${isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}
         `}
@@ -48,8 +53,8 @@ export const FocusViolationModal: React.FC<FocusViolationModalProps> = ({
 
                     <p className="text-gray-400 mb-6 leading-relaxed">
                         {isFinal
-                            ? "Max violations reached. To maintain integrity, this session has been ended."
-                            : "You left the focus window. Switching tabs or minimizing is disallowed during Focus Mode."
+                            ? "Max violations reached. To maintain integrity, this session has been ended. No progress will be saved."
+                            : "You left the focus window. Switching tabs or minimizing is not allowed during your session."
                         }
                     </p>
 
@@ -59,21 +64,22 @@ export const FocusViolationModal: React.FC<FocusViolationModalProps> = ({
                         </div>
                     )}
 
-                    <div className="flex gap-3 w-full">
-                        {!isFinal && (
+                    <div className="w-full">
+                        {isFinal ? (
+                            <button
+                                onClick={handleExit}
+                                className="w-full py-3 bg-red-600 border border-red-500 text-white font-bold rounded-xl hover:bg-red-700 transition-colors"
+                            >
+                                Exit Session
+                            </button>
+                        ) : (
                             <button
                                 onClick={handleResume}
-                                className="flex-1 py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors"
+                                className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-colors"
                             >
                                 I'm Back
                             </button>
                         )}
-                        <button
-                            onClick={onEndSession}
-                            className={`flex-1 py-3 border border-white/10 text-white rounded-xl hover:bg-white/5 transition-colors ${isFinal ? 'bg-red-600 border-red-500 hover:bg-red-700 w-full' : ''}`}
-                        >
-                            Start Over
-                        </button>
                     </div>
                 </div>
             </div>

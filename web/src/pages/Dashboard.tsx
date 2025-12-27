@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
-import { useDashboard, SuggestedTopic, fetchConceptMastery, fetchPerformanceTrend, ConceptMastery, RecentScore } from '../hooks/useDashboard';
+import { useDashboard, fetchConceptMastery, fetchPerformanceTrend, ConceptMastery, RecentScore } from '../hooks/useDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { getRecentPractice, SubjectProgress } from '../utils/progress';
 import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
@@ -312,8 +312,8 @@ export const DashboardPage: React.FC = () => {
                   </button>
 
                   {/* Topics List */}
-                  {continueLearning.slice(0, 3).map((topic, index) => (
-                    <TopicCard key={`${topic.subject}-${topic.topic}`} topic={topic} index={index} />
+                  {continueLearning.slice(0, 3).map((topic) => (
+                    <TopicCard key={`${topic.subject}-${topic.topic}`} topic={topic} />
                   ))}
 
                   {continueLearning.length === 0 && (
@@ -358,22 +358,27 @@ export const DashboardPage: React.FC = () => {
                 <Zap className="text-violet-400" size={20} />
                 Subject Insights (SWOT)
               </h3>
-              <div className="mb-4">
-                <label htmlFor="subject-select" className="block text-slate-400 text-sm mb-2 font-medium">
-                  Select Subject
-                </label>
-                <select
-                  id="subject-select"
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                  className="w-full md:w-64 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
-                >
-                  {availableSubjects.map((subject) => (
-                    <option key={subject} value={subject} className="bg-slate-900 text-white">
+              {/* Subject Tabs */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {availableSubjects.map((subject) => {
+                  const isSelected = selectedSubject === subject;
+                  const bgColor = getSubjectBgColor(subject);
+                  return (
+                    <button
+                      key={subject}
+                      onClick={() => setSelectedSubject(subject)}
+                      className={`
+                        px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200
+                        ${isSelected
+                          ? `${bgColor} text-white shadow-lg`
+                          : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/5'
+                        }
+                      `}
+                    >
                       {formatSubjectName(subject)}
-                    </option>
-                  ))}
-                </select>
+                    </button>
+                  );
+                })}
               </div>
               {isLoadingConcepts ? (
                 <div className="p-12 text-center">
@@ -407,11 +412,10 @@ export const DashboardPage: React.FC = () => {
             <div className="glass rounded-3xl p-6 border border-white/5">
               <h3 className="font-display text-xl text-white mb-4">Recommended for You</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {suggestedTopics.map((topic, index) => (
+                {suggestedTopics.map((topic) => (
                   <TopicCard
                     key={`${topic.subject}-${topic.topic}`}
                     topic={topic}
-                    index={index}
                     suggested
                   />
                 ))}
@@ -490,7 +494,7 @@ const SubjectProgressCard = ({ subject, score }: any) => {
   );
 };
 
-const TopicCard = ({ topic, index, suggested }: any) => {
+const TopicCard = ({ topic, suggested }: any) => {
   const borderColor = getSubjectBorderColor(topic.subject);
   const displaySubject = formatSubjectName(topic.subject);
 
