@@ -123,12 +123,13 @@ class LoginViewModel @Inject constructor(
                 }
                 .onFailure { error ->
                     Timber.e(error, "Failed to fetch profile from backend")
+                    // Clear stored credentials since we couldn't validate with backend
+                    authManager.logout()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            isAuthenticated = true,
-                            // Use needsOnboarding from AuthManager (set by deep link)
-                            error = "Failed to load profile: ${error.message}"
+                            isAuthenticated = false,
+                            error = "Authentication failed: ${error.message}. Please try again."
                         )
                     }
                 }

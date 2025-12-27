@@ -1,3 +1,98 @@
 <resources>
     <string name="app_name">Prepverse</string>
+
+    <!-- Focus Mode -->
+    <string name="focus_mode_title">Focus Mode</string>
+    <string name="focus_mode_subtitle">Stay focused, achieve more</string>
+    <string name="focus_accessibility_description">PrepVerse Focus Mode monitors which app is in the foreground to help you stay focused during study sessions and assessments. This service only activates when you start a focus session.</string>
+
+    <!-- Focus Timer -->
+    <string name="focus_time_label">Focus Time</string>
+    <string name="break_time_label">Break Time</string>
+    <string name="minutes_format">%d min</string>
+    <string name="timer_format" formatted="false">%02d:%02d</string>
+    <string name="state_focusing">FOCUSING</string>
+    <string name="state_break">BREAK</string>
+    <string name="state_paused">PAUSED</string>
+    <string name="state_idle">READY</string>
+
+    <!-- Focus Settings -->
+    <string name="focus_settings_title">Focus Settings</string>
+    <string name="focus_duration_label">Focus Duration</string>
+    <string name="break_duration_label">Break Duration</string>
+    <string name="dnd_enabled">Do Not Disturb</string>
+    <string name="app_blocking_enabled">App Blocking</string>
+    <string name="save_settings">Save</string>
+
+    <!-- Focus Controls -->
+    <string name="start_focus">Start Focus</string>
+    <string name="pause_focus">Pause</string>
+    <string name="resume_focus">Resume</string>
+    <string name="end_focus">End Session</string>
+    <string name="skip_break">Skip Break</string>
+
+    <!-- Focus Warning Dialog -->
+    <string name="secure_focus_mode">Secure Focus Mode</string>
+    <string name="focus_rules_intro">To ensure a distraction-free environment, the following rules are active:</string>
+    <string name="focus_rule_1">Switching to other apps is not allowed during focus time.</string>
+    <string name="focus_rule_2">Notifications will be silenced (Do Not Disturb mode).</string>
+    <string name="focus_rule_3">Maximum of 3 violations allowed before session ends.</string>
+    <string name="authorize_and_start">Authorize and Start</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Focus Violation Dialog -->
+    <string name="focus_violation">Focus Violation</string>
+    <string name="violation_detected">You left the PrepVerse app during focus mode.</string>
+    <string name="violation_count">Attempt %1$d of %2$d</string>
+    <string name="return_to_focus">Return to Focus</string>
+    <string name="session_terminated">Session Terminated</string>
+    <string name="too_many_violations">Too many violations. Your focus session has been ended.</string>
+    <string name="return_to_dashboard">Return to Dashboard</string>
+
+    <!-- Focus Break Dialog -->
+    <string name="break_time">Break Time!</string>
+    <string name="break_message">Great work! Take a short break to recharge.</string>
+    <string name="break_remaining">Break ends in</string>
+
+    <!-- Focus Permissions -->
+    <string name="accessibility_permission_title">Accessibility Permission Required</string>
+    <string name="accessibility_permission_message">To block other apps during focus mode, PrepVerse needs accessibility permission. This helps you stay focused during study sessions.</string>
+    <string name="dnd_permission_title">Do Not Disturb Permission</string>
+    <string name="dnd_permission_message">To silence notifications during focus mode, PrepVerse needs permission to control Do Not Disturb settings.</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="not_now">Not Now</string>
+
+    <!-- Focus Notification -->
+    <string name="focus_notification_channel">Focus Mode</string>
+    <string name="focus_notification_title">Focus Mode Active</string>
+    <string name="focus_notification_text">Stay focused! Time remaining: %s</string>
+    <string name="break_notification_title">Break Time</string>
+    <string name="break_notification_text">Take a break! %s remaining</string>
+
+    <!-- Quiz Focus Mode -->
+    <string name="secure_exam_mode">Secure Exam Mode</string>
+    <string name="exam_rules_intro">To ensure a fair testing environment, the following rules are active:</string>
+    <string name="exam_rule_1">Switching apps or minimizing is prohibited.</string>
+    <string name="exam_rule_2">You have 3 chances before the quiz is terminated.</string>
+    <string name="exam_rule_3">Focus on your exam to get accurate results!</string>
+    <string name="start_assessment">Start Assessment</string>
+
+    <!-- Focus Session Complete -->
+    <string name="session_complete">Session Complete!</string>
+    <string name="focus_time_achieved">Focus time achieved</string>
+    <string name="violations_recorded">Violations</string>
+    <string name="great_job">Great job staying focused!</string>
+    <string name="done">Done</string>
+
+    <!-- Permission Screen -->
+    <string name="permissions_required_title">Permissions Required</string>
+    <string name="permissions_required_subtitle">PrepVerse needs a few permissions to help you stay focused during study sessions and assessments.</string>
+    <string name="accessibility_permission_desc">Monitors which app is active to help you stay focused</string>
+    <string name="dnd_permission_desc">Silences notifications during focus and exam sessions</string>
+    <string name="notification_permission_title">Notifications</string>
+    <string name="notification_permission_desc">Shows focus timer and session updates</string>
+    <string name="permissions_info">These permissions are used only during focus sessions and assessments. PrepVerse does not collect or share your data.</string>
+    <string name="continue_to_app">Continue to PrepVerse</string>
+    <string name="granted">Granted</string>
+    <string name="grant">Grant</string>
 </resources>

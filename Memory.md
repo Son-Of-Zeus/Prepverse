@@ -535,6 +535,7 @@ cd web && npm run dev
 | File | Purpose |
 |------|---------|
 | `local/TokenStorage.kt` | Encrypted token storage (EncryptedSharedPreferences) |
+| `local/FocusModePreferences.kt` | DataStore preferences for focus mode settings |
 | `remote/AuthManager.kt` | Server-side OAuth via Chrome Custom Tabs |
 | `remote/api/PrepVerseApi.kt` | Retrofit API interface for backend calls |
 | `remote/api/dto/UserDtos.kt` | User profile DTOs |
@@ -549,6 +550,30 @@ cd web && npm run dev
 |------|---------|
 | `User.kt` | User and UserProfile models |
 | `Question.kt` | OnboardingQuestion, Question, QuestionAttempt, Subject, Difficulty models |
+| `FocusSession.kt` | FocusSession, FocusState, FocusModeSettings models |
+
+### Services (`services/`)
+| File | Purpose |
+|------|---------|
+| `FocusAccessibilityService.kt` | Monitors foreground app, detects violations when user leaves app |
+| `FocusModeService.kt` | Foreground service managing focus timer, DND, and session state |
+
+### Focus Mode Screens (`ui/screens/focus/`)
+| File | Purpose |
+|------|---------|
+| `FocusModeScreen.kt` | Main focus mode UI with timer, settings, controls |
+| `FocusModeViewModel.kt` | Focus mode state management |
+| `FocusDialogs.kt` | Warning, settings, violation, break, and completion dialogs |
+
+### Onboarding Updates (`ui/screens/onboarding/`)
+| File | Purpose |
+|------|---------|
+| `QuizFocusProtection.kt` | Focus protection wrapper for onboarding quiz (3 violations = termination) |
+
+### Permission Screen (`ui/screens/permission/`)
+| File | Purpose |
+|------|---------|
+| `PermissionScreen.kt` | Mandatory permission screen shown on app start (Accessibility, DND, Notifications) |
 
 ### DI (`di/`)
 | File | Purpose |
@@ -756,4 +781,49 @@ cd web && npm run dev
 
 ---
 
-*Last Updated: 2025-12-25*
+### 2024-12-26 - Focus Mode Implementation
+- **Android Focus Mode**: Complete implementation of focus mode with app blocking
+  - New files created:
+    - `services/FocusAccessibilityService.kt` - AccessibilityService for app switch detection
+    - `services/FocusModeService.kt` - Foreground service for timer and DND
+    - `data/local/FocusModePreferences.kt` - DataStore for focus settings
+    - `domain/model/FocusSession.kt` - Focus session and settings models
+    - `ui/screens/focus/FocusModeScreen.kt` - Main focus mode UI
+    - `ui/screens/focus/FocusModeViewModel.kt` - Focus state management
+    - `ui/screens/focus/FocusDialogs.kt` - All focus-related dialogs
+    - `ui/screens/onboarding/QuizFocusProtection.kt` - Quiz focus protection
+    - `res/xml/focus_accessibility_config.xml` - Accessibility service config
+
+  - **Features**:
+    - Configurable pomodoro timer (5-120 min focus, 1-30 min break)
+    - App blocking via AccessibilityService (detects app switches)
+    - Do Not Disturb mode integration
+    - Violation tracking (3 violations = session terminated)
+    - Pre-session warning dialog
+    - Break timer with skip option
+    - Session completion statistics
+
+  - **Quiz Protection**:
+    - Onboarding quiz now wrapped with QuizFocusProtection
+    - Shows warning dialog before quiz
+    - 3 violations terminate quiz and redirect to dashboard
+    - Violations displayed in quiz header
+
+  - **Permissions Added** (AndroidManifest.xml):
+    - `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`
+    - `POST_NOTIFICATIONS`, `ACCESS_NOTIFICATION_POLICY`
+    - `SYSTEM_ALERT_WINDOW`, `PACKAGE_USAGE_STATS`
+
+  - **String Resources**: Added 50+ strings for focus mode UI
+
+  - **Mandatory Permission Screen**: Added PermissionScreen that blocks app until permissions granted
+    - Created `ui/screens/permission/PermissionScreen.kt`
+    - Added `Routes.Permissions` as new start destination
+    - Updated NavGraph to start with permission check
+    - Requires: Accessibility Service, DND Access, Notifications (Android 13+)
+    - Auto-navigates to Login after all permissions granted
+    - Re-checks permissions when user returns from Settings
+
+---
+
+*Last Updated: 2024-12-26*

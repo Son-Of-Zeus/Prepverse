@@ -6,11 +6,20 @@ import { QuestionCard } from '../components/onboarding/QuestionCard';
 import { AssessmentTimer } from '../components/onboarding/AssessmentTimer';
 import { ProgressIndicator, QuestionDots } from '../components/onboarding/ProgressIndicator';
 import { ResultsScreen } from '../components/onboarding/ResultsScreen';
+// Focus mode imports (from sanghu)
 import { FocusHistoryTracker, FocusStatistics } from '../utils/focusHistory';
 import { FocusModeSettings, FocusModeSettings as FocusModeSettingsType } from '../components/onboarding/FocusModeSettings';
 import { FocusModeSession } from '../components/onboarding/FocusModeSession';
+// Backend API imports (from main)
+import {
+  getOnboardingQuestions,
+  submitOnboardingAnswers,
+  OnboardingQuestion,
+  OnboardingAnswer,
+  OnboardingResponse,
+} from '../api/onboarding';
 
-// Types
+// Types for QuestionCard component (options with id/text format)
 interface Option {
   id: string;
   text: string;
@@ -22,11 +31,12 @@ interface Question {
   topic: string;
   text: string;
   options: Option[];
-  correctAnswer: string;
 }
 
-type OnboardingStep = 'welcome' | 'class-select' | 'quiz' | 'results';
+// Combined step type (includes loading/submitting from main)
+type OnboardingStep = 'welcome' | 'class-select' | 'loading' | 'quiz' | 'submitting' | 'results';
 
+// Session tracking types (from sanghu)
 interface InterruptionEvent {
   type: 'tab_switch' | 'window_blur' | 'visibility_change';
   timestamp: number;
@@ -44,143 +54,27 @@ interface SessionTracking {
   focusStatistics?: FocusStatistics; // Focus history statistics
 }
 
-// Mock data for demonstration
-const mockQuestions: Question[] = [
-  {
-    id: 'q1',
-    subject: 'Mathematics',
-    topic: 'Quadratic Equations',
-    text: 'What is the degree of the polynomial x\u00B2 + 3x + 2?',
-    options: [
-      { id: 'a', text: '1' },
-      { id: 'b', text: '2' },
-      { id: 'c', text: '3' },
-      { id: 'd', text: '0' },
-    ],
-    correctAnswer: 'b',
-  },
-  {
-    id: 'q2',
-    subject: 'Physics',
-    topic: 'Electricity',
-    text: 'What is the SI unit of electric current?',
-    options: [
-      { id: 'a', text: 'Volt' },
-      { id: 'b', text: 'Ampere' },
-      { id: 'c', text: 'Ohm' },
-      { id: 'd', text: 'Watt' },
-    ],
-    correctAnswer: 'b',
-  },
-  {
-    id: 'q3',
-    subject: 'Chemistry',
-    topic: 'Chemical Reactions',
-    text: 'Which gas is evolved when zinc reacts with dilute hydrochloric acid?',
-    options: [
-      { id: 'a', text: 'Oxygen' },
-      { id: 'b', text: 'Chlorine' },
-      { id: 'c', text: 'Hydrogen' },
-      { id: 'd', text: 'Nitrogen' },
-    ],
-    correctAnswer: 'c',
-  },
-  {
-    id: 'q4',
-    subject: 'Mathematics',
-    topic: 'Trigonometry',
-    text: 'What is the value of sin 30\u00B0?',
-    options: [
-      { id: 'a', text: '0' },
-      { id: 'b', text: '1/2' },
-      { id: 'c', text: '\u221A3/2' },
-      { id: 'd', text: '1' },
-    ],
-    correctAnswer: 'b',
-  },
-  {
-    id: 'q5',
-    subject: 'Physics',
-    topic: 'Light',
-    text: 'What type of mirror is used in a car headlight?',
-    options: [
-      { id: 'a', text: 'Plane mirror' },
-      { id: 'b', text: 'Concave mirror' },
-      { id: 'c', text: 'Convex mirror' },
-      { id: 'd', text: 'Cylindrical mirror' },
-    ],
-    correctAnswer: 'b',
-  },
-  {
-    id: 'q6',
-    subject: 'Biology',
-    topic: 'Human Body',
-    text: 'Which organ is responsible for filtering blood in the human body?',
-    options: [
-      { id: 'a', text: 'Heart' },
-      { id: 'b', text: 'Liver' },
-      { id: 'c', text: 'Kidney' },
-      { id: 'd', text: 'Lungs' },
-    ],
-    correctAnswer: 'c',
-  },
-  {
-    id: 'q7',
-    subject: 'Mathematics',
-    topic: 'Statistics',
-    text: 'What is the mode of the data set: 2, 3, 3, 4, 5, 5, 5, 6?',
-    options: [
-      { id: 'a', text: '3' },
-      { id: 'b', text: '4' },
-      { id: 'c', text: '5' },
-      { id: 'd', text: '6' },
-    ],
-    correctAnswer: 'c',
-  },
-  {
-    id: 'q8',
-    subject: 'Chemistry',
-    topic: 'Periodic Table',
-    text: 'Which element has the atomic number 6?',
-    options: [
-      { id: 'a', text: 'Nitrogen' },
-      { id: 'b', text: 'Carbon' },
-      { id: 'c', text: 'Oxygen' },
-      { id: 'd', text: 'Boron' },
-    ],
-    correctAnswer: 'b',
-  },
-  {
-    id: 'q9',
-    subject: 'Physics',
-    topic: 'Motion',
-    text: 'What is the acceleration due to gravity on Earth (approximate)?',
-    options: [
-      { id: 'a', text: '8.9 m/s\u00B2' },
-      { id: 'b', text: '9.8 m/s\u00B2' },
-      { id: 'c', text: '10.8 m/s\u00B2' },
-      { id: 'd', text: '11.8 m/s\u00B2' },
-    ],
-    correctAnswer: 'b',
-  },
-  {
-    id: 'q10',
-    subject: 'Mathematics',
-    topic: 'Geometry',
-    text: 'What is the sum of all interior angles of a hexagon?',
-    options: [
-      { id: 'a', text: '540\u00B0' },
-      { id: 'b', text: '720\u00B0' },
-      { id: 'c', text: '900\u00B0' },
-      { id: 'd', text: '1080\u00B0' },
-    ],
-    correctAnswer: 'b',
-  },
-];
-
 interface OnboardingPageProps {
   onComplete?: () => void;
 }
+
+/**
+ * Convert backend question format to QuestionCard format
+ * Backend returns options as string[], QuestionCard expects {id, text}[]
+ */
+const convertToQuestionCardFormat = (backendQuestions: OnboardingQuestion[]): Question[] => {
+  const optionIds = ['a', 'b', 'c', 'd'];
+  return backendQuestions.map((q) => ({
+    id: q.id,
+    subject: q.subject,
+    topic: q.topic,
+    text: q.question,
+    options: q.options.map((optText, idx) => ({
+      id: optionIds[idx] ?? 'a',
+      text: optText,
+    })),
+  }));
+};
 
 /**
  * Onboarding Page - The complete onboarding assessment flow
@@ -190,6 +84,8 @@ interface OnboardingPageProps {
  * - Combines all onboarding components into a cohesive experience
  * - Keyboard navigation support throughout
  * - Responsive design that works on all screen sizes
+ * - Focus mode with session tracking for better learning
+ * - Backend integration for question fetching and answer submission
  */
 export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
   const [step, setStep] = useState<OnboardingStep>('welcome');
@@ -198,14 +94,14 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isTimerPaused] = useState(false);
 
-  // Focus mode settings
+  // Focus mode settings (from sanghu)
   const [focusModeSettings, setFocusModeSettings] = useState<FocusModeSettingsType>({
     pomodoroMinutes: 25,
     breakMinutes: 5,
     enabled: false,
   });
 
-  // Session tracking state
+  // Session tracking state (from sanghu)
   const [sessionTracking, setSessionTracking] = useState<SessionTracking>({
     startTime: null,
     endTime: null,
@@ -216,7 +112,13 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     lastInterruptionStart: null,
   });
 
-  // Refs for tracking
+  // Backend data state (from main)
+  const [backendQuestions, setBackendQuestions] = useState<OnboardingQuestion[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [evaluationResult, setEvaluationResult] = useState<OnboardingResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Refs for tracking (from sanghu)
   const sessionStartRef = useRef<number | null>(null);
   const lastActiveTimeRef = useRef<number | null>(null);
   const interruptionStartRef = useRef<number | null>(null);
@@ -231,10 +133,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     const startTime = Date.now();
     sessionStartRef.current = startTime;
     lastActiveTimeRef.current = startTime;
-    
-    // Initialize focus history tracker only if focus mode is enabled
-    // (Will be initialized when quiz starts if focus mode is enabled)
-    
+
     setSessionTracking({
       startTime,
       endTime: null,
@@ -261,19 +160,34 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     setSelectedClass(classLevel);
   };
 
-  const handleStartAssessment = () => {
-    if (selectedClass) {
-      // Initialize focus history tracker only if focus mode is enabled
-      if (focusModeSettings.enabled && !focusHistoryTrackerRef.current) {
-        const startTime = sessionStartRef.current || Date.now();
-        focusHistoryTrackerRef.current = new FocusHistoryTracker(startTime);
-      }
+  // Combined handleStartAssessment: fetches from backend AND initializes focus tracking
+  const handleStartAssessment = async () => {
+    if (!selectedClass) return;
+
+    setStep('loading');
+    setError(null);
+
+    // Initialize focus history tracker only if focus mode is enabled (from sanghu)
+    if (focusModeSettings.enabled && !focusHistoryTrackerRef.current) {
+      const startTime = sessionStartRef.current || Date.now();
+      focusHistoryTrackerRef.current = new FocusHistoryTracker(startTime);
+    }
+
+    try {
+      // Fetch questions from backend (from main)
+      const fetchedQuestions = await getOnboardingQuestions(selectedClass);
+      setBackendQuestions(fetchedQuestions);
+      setQuestions(convertToQuestionCardFormat(fetchedQuestions));
       setStep('quiz');
+    } catch (err) {
+      console.error('Failed to fetch questions:', err);
+      setError('Failed to load questions. Please try again.');
+      setStep('class-select');
     }
   };
 
   const handleSelectAnswer = (optionId: string) => {
-    const question = mockQuestions[currentQuestion - 1];
+    const question = questions[currentQuestion - 1];
     if (question) {
       setAnswers((prev) => ({
         ...prev,
@@ -282,69 +196,43 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     }
   };
 
-  const handleNextQuestion = () => {
-    if (currentQuestion < mockQuestions.length) {
-      setCurrentQuestion((prev) => prev + 1);
-    } else {
-      // Assessment complete - end session tracking
-      const endTime = Date.now();
-      if (sessionStartRef.current) {
-        const totalElapsed = endTime - sessionStartRef.current;
-        const finalInterruptionDuration = interruptionStartRef.current
-          ? endTime - interruptionStartRef.current
-          : 0;
-        
-        // Finalize focus history tracking only if focus mode was enabled
-        if (focusModeSettings.enabled && focusHistoryTrackerRef.current) {
-          focusHistoryTrackerRef.current.finalize(endTime);
-          const focusStats = focusHistoryTrackerRef.current.calculateStatistics(
-            endTime,
-            sessionTracking.interruptions
-          );
-          
-          setSessionTracking((prev) => {
-            const actualDuration = prev.actualDuration - finalInterruptionDuration;
-            return {
-              ...prev,
-              endTime,
-              totalElapsed,
-              actualDuration: Math.max(0, actualDuration),
-              isActive: false,
-              focusStatistics: focusStats,
-            };
-          });
-        } else {
-          setSessionTracking((prev) => {
-            const actualDuration = prev.actualDuration - finalInterruptionDuration;
-            return {
-              ...prev,
-              endTime,
-              totalElapsed,
-              actualDuration: Math.max(0, actualDuration),
-              isActive: false,
-            };
-          });
-        }
-      }
-      
-      // Clear interval
-      if (durationUpdateIntervalRef.current) {
-        clearInterval(durationUpdateIntervalRef.current);
-      }
-      
+  // Submit answers to backend (from main)
+  const handleSubmitAnswers = async () => {
+    setStep('submitting');
+    setError(null);
+
+    try {
+      // Convert answers to backend format
+      const optionIds = ['a', 'b', 'c', 'd'];
+      const submissionAnswers: OnboardingAnswer[] = backendQuestions.map((q) => {
+        const selectedOptionId = answers[q.id] || 'a'; // Default to 'a' if not answered
+        const optionIndex = optionIds.indexOf(selectedOptionId);
+        const selectedAnswer = q.options[optionIndex] ?? q.options[0] ?? '';
+        return {
+          question_id: q.id,
+          selected_answer: selectedAnswer,
+        };
+      });
+
+      const result = await submitOnboardingAnswers(submissionAnswers);
+      setEvaluationResult(result);
       setStep('results');
+    } catch (err) {
+      console.error('Failed to submit answers:', err);
+      setError('Failed to submit answers. Please try again.');
+      setStep('quiz');
     }
   };
 
-  const handleTimeUp = useCallback(() => {
-    // End session tracking
+  // Helper to finalize session tracking (from sanghu)
+  const finalizeSessionTracking = useCallback(() => {
     const endTime = Date.now();
     if (sessionStartRef.current) {
       const totalElapsed = endTime - sessionStartRef.current;
       const finalInterruptionDuration = interruptionStartRef.current
         ? endTime - interruptionStartRef.current
         : 0;
-      
+
       // Finalize focus history tracking only if focus mode was enabled
       if (focusModeSettings.enabled && focusHistoryTrackerRef.current) {
         focusHistoryTrackerRef.current.finalize(endTime);
@@ -352,7 +240,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
           endTime,
           sessionTracking.interruptions
         );
-        
+
         setSessionTracking((prev) => {
           const actualDuration = prev.actualDuration - finalInterruptionDuration;
           return {
@@ -377,23 +265,35 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
         });
       }
     }
-    
+
     // Clear interval
     if (durationUpdateIntervalRef.current) {
       clearInterval(durationUpdateIntervalRef.current);
     }
-    
-    setStep('results');
   }, [sessionTracking.interruptions, focusModeSettings.enabled]);
+
+  const handleNextQuestion = () => {
+    if (currentQuestion < questions.length) {
+      setCurrentQuestion((prev) => prev + 1);
+    } else {
+      // Assessment complete - finalize session tracking and submit answers
+      finalizeSessionTracking();
+      handleSubmitAnswers();
+    }
+  };
+
+  const handleTimeUp = useCallback(() => {
+    // End session tracking (from sanghu)
+    finalizeSessionTracking();
+    // Submit answers to backend (from main)
+    handleSubmitAnswers();
+  }, [finalizeSessionTracking]);
 
   const handleGoToDashboard = () => {
     onComplete?.();
   };
 
-  // Handle break start
-
-
-  // Session tracking: Update actual duration periodically (works for all steps)
+  // Session tracking: Update actual duration periodically (from sanghu)
   useEffect(() => {
     if (sessionTracking.isActive && !interruptionStartRef.current) {
       durationUpdateIntervalRef.current = setInterval(() => {
@@ -401,15 +301,15 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
           const now = Date.now();
           const elapsed = now - lastActiveTimeRef.current;
           lastActiveTimeRef.current = now;
-          
+
           setSessionTracking((prev) => ({
             ...prev,
             actualDuration: prev.actualDuration + elapsed,
             totalElapsed: now - (sessionStartRef.current || now),
           }));
         }
-      }, 1000); // Update every second
-      
+      }, 1000);
+
       return () => {
         if (durationUpdateIntervalRef.current) {
           clearInterval(durationUpdateIntervalRef.current);
@@ -418,7 +318,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     }
   }, [sessionTracking.isActive]);
 
-  // Session tracking: Handle visibility changes (tab switch, minimize, etc.) - works for all steps
+  // Session tracking: Handle visibility changes (from sanghu)
   useEffect(() => {
     if (!sessionTracking.isActive) return;
 
@@ -427,12 +327,11 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       const now = Date.now();
 
       if (!isVisible && !interruptionStartRef.current) {
-        // Interruption started - record unfocus only if focus mode is enabled
         interruptionStartRef.current = now;
         if (focusModeSettings.enabled) {
           focusHistoryTrackerRef.current?.recordUnfocus(now);
         }
-        
+
         setSessionTracking((prev) => ({
           ...prev,
           interruptions: [
@@ -445,21 +344,20 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
           lastInterruptionStart: now,
         }));
       } else if (isVisible && interruptionStartRef.current) {
-        // Interruption ended - record focus only if focus mode is enabled
         const interruptionDuration = now - interruptionStartRef.current;
         interruptionStartRef.current = null;
         lastActiveTimeRef.current = now;
         if (focusModeSettings.enabled) {
           focusHistoryTrackerRef.current?.recordFocus(now);
         }
-        
+
         setSessionTracking((prev) => {
           const updatedInterruptions = [...prev.interruptions];
           const lastInterruption = updatedInterruptions[updatedInterruptions.length - 1];
           if (lastInterruption && lastInterruption.type === 'visibility_change') {
             lastInterruption.duration = interruptionDuration;
           }
-          
+
           return {
             ...prev,
             interruptions: updatedInterruptions,
@@ -472,13 +370,13 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     const handleBlur = () => {
       if (!sessionTracking.isActive) return;
       const now = Date.now();
-      
+
       if (!interruptionStartRef.current) {
         interruptionStartRef.current = now;
         if (focusModeSettings.enabled) {
           focusHistoryTrackerRef.current?.recordUnfocus(now);
         }
-        
+
         setSessionTracking((prev) => ({
           ...prev,
           interruptions: [
@@ -496,7 +394,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     const handleFocus = () => {
       if (!sessionTracking.isActive) return;
       const now = Date.now();
-      
+
       if (interruptionStartRef.current) {
         const interruptionDuration = now - interruptionStartRef.current;
         interruptionStartRef.current = null;
@@ -504,14 +402,14 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
         if (focusModeSettings.enabled) {
           focusHistoryTrackerRef.current?.recordFocus(now);
         }
-        
+
         setSessionTracking((prev) => {
           const updatedInterruptions = [...prev.interruptions];
           const lastInterruption = updatedInterruptions[updatedInterruptions.length - 1];
           if (lastInterruption && (lastInterruption.type === 'window_blur' || lastInterruption.type === 'tab_switch')) {
             lastInterruption.duration = interruptionDuration;
           }
-          
+
           return {
             ...prev,
             interruptions: updatedInterruptions,
@@ -532,7 +430,7 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     };
   }, [sessionTracking.isActive, focusModeSettings.enabled]);
 
-  // Store session data to localStorage for persistence
+  // Store session data to localStorage (from sanghu)
   useEffect(() => {
     if (sessionTracking.isActive && sessionTracking.startTime) {
       const sessionData = {
@@ -542,10 +440,8 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       };
       localStorage.setItem('onboarding_session_tracking', JSON.stringify(sessionData));
     } else if (step === 'results' && sessionTracking.endTime) {
-      // Final save when results are shown
       localStorage.setItem('onboarding_session_tracking', JSON.stringify(sessionTracking));
-      
-      // Log session summary to console (for debugging/verification)
+
       console.log('Session Tracking Summary:', {
         totalElapsed: `${Math.round(sessionTracking.totalElapsed / 1000)}s`,
         actualDuration: `${Math.round(sessionTracking.actualDuration / 1000)}s`,
@@ -559,13 +455,13 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     }
   }, [step, sessionTracking]);
 
-  // Keyboard navigation
+  // Keyboard navigation (combined - uses backend questions)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (step === 'quiz') {
-        const question = mockQuestions[currentQuestion - 1];
+      if (step === 'quiz' && questions.length > 0) {
+        const question = questions[currentQuestion - 1];
         if (!question) return;
-        
+
         const keyMap: Record<string, string> = { a: 'a', b: 'b', c: 'c', d: 'd' };
         const selectedOption = keyMap[e.key.toLowerCase()];
 
@@ -581,51 +477,61 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [step, currentQuestion, answers]);
+  }, [step, currentQuestion, answers, questions]);
 
-  // Calculate results
+  // Calculate results for display (from main - uses backend evaluation)
   const calculateResults = () => {
-    let correct = 0;
-    const subjectScores: Record<string, { correct: number; total: number }> = {};
+    if (evaluationResult) {
+      const subjectScores: Record<string, { correct: number; total: number }> = {};
 
-    mockQuestions.forEach((question) => {
-      const subject = question.subject.toLowerCase();
-      if (!subjectScores[subject]) {
-        subjectScores[subject] = { correct: 0, total: 0 };
-      }
-      subjectScores[subject].total++;
+      evaluationResult.results.forEach((result) => {
+        const subject = result.subject.toLowerCase();
+        if (!subjectScores[subject]) {
+          subjectScores[subject] = { correct: 0, total: 0 };
+        }
+        subjectScores[subject].total++;
+        if (result.is_correct) {
+          subjectScores[subject].correct++;
+        }
+      });
 
-      if (answers[question.id] === question.correctAnswer) {
-        correct++;
-        subjectScores[subject].correct++;
-      }
-    });
+      const subjectScoresArray = Object.entries(subjectScores).map(([subject, scores]) => ({
+        subject,
+        correct: scores.correct,
+        total: scores.total,
+        percentage: (scores.correct / scores.total) * 100,
+      }));
 
-    const subjectScoresArray = Object.entries(subjectScores).map(([subject, scores]) => ({
-      subject,
-      correct: scores.correct,
-      total: scores.total,
-      percentage: (scores.correct / scores.total) * 100,
-    }));
+      return {
+        score: evaluationResult.correct_answers,
+        total: evaluationResult.total_questions,
+        strengths: evaluationResult.strong_topics,
+        weaknesses: evaluationResult.weak_topics,
+        subjectScores: subjectScoresArray,
+        xpEarned: 100 + evaluationResult.correct_answers * 10,
+        level:
+          evaluationResult.score_percentage >= 80
+            ? 'Scholar'
+            : evaluationResult.score_percentage >= 50
+            ? 'Learner'
+            : 'Beginner',
+      };
+    }
 
-    // Determine strengths and weaknesses
-    const sortedSubjects = subjectScoresArray.sort((a, b) => b.percentage - a.percentage);
-    const strengths = sortedSubjects.slice(0, 2).map((s) => s.subject);
-    const weaknesses = sortedSubjects.slice(-2).map((s) => s.subject);
-
+    // Fallback (should not happen with backend evaluation)
     return {
-      score: correct,
-      total: mockQuestions.length,
-      strengths,
-      weaknesses,
-      subjectScores: subjectScoresArray,
-      xpEarned: 100 + correct * 10,
-      level: correct >= 8 ? 'Scholar' : correct >= 5 ? 'Learner' : 'Beginner',
+      score: 0,
+      total: 10,
+      strengths: [],
+      weaknesses: [],
+      subjectScores: [],
+      xpEarned: 100,
+      level: 'Beginner',
     };
   };
 
   const answeredQuestions = new Set(
-    Object.keys(answers).map((id) => mockQuestions.findIndex((q) => q.id === id) + 1)
+    Object.keys(answers).map((id) => questions.findIndex((q) => q.id === id) + 1)
   );
 
   return (
@@ -644,11 +550,18 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
             <div className="w-full max-w-2xl space-y-8">
               <ClassSelector onSelect={handleClassSelect} selectedClass={selectedClass} />
 
-              {/* Focus Mode Settings */}
+              {/* Focus Mode Settings (from sanghu) */}
               <FocusModeSettings
                 onSettingsChange={setFocusModeSettings}
                 initialSettings={focusModeSettings}
               />
+
+              {/* Error message (from main) */}
+              {error && (
+                <div className="px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
 
               {/* Continue button */}
               <div
@@ -674,71 +587,95 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
           </div>
         )}
 
-        {step === 'quiz' && (
+        {/* Loading/Submitting states (from main) */}
+        {(step === 'loading' || step === 'submitting') && (
+          <div className="min-h-screen flex flex-col items-center justify-center p-8">
+            <div className="text-center">
+              {/* Loading spinner */}
+              <div className="relative w-20 h-20 mx-auto mb-6">
+                <div className="absolute inset-0 rounded-full border-4 border-white/10" />
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-prepverse-red animate-spin" />
+              </div>
+              <p className="text-lg text-gray-300">
+                {step === 'loading' ? 'Loading questions...' : 'Submitting your answers...'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Quiz with FocusModeSession wrapper (combined) */}
+        {step === 'quiz' && questions.length > 0 && (
           <FocusModeSession settings={focusModeSettings}>
             <div className="min-h-screen flex flex-col p-4 md:p-8">
-            {/* Top bar with timer and progress */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
-              {/* Timer */}
-              <AssessmentTimer
-                totalSeconds={600}
-                onTimeUp={handleTimeUp}
-                isPaused={isTimerPaused}
-              />
+              {/* Top bar with timer and progress */}
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
+                {/* Timer */}
+                <AssessmentTimer
+                  totalSeconds={600}
+                  onTimeUp={handleTimeUp}
+                  isPaused={isTimerPaused}
+                />
 
-              {/* Question dots for desktop */}
-              <div className="hidden md:block">
-                <QuestionDots
+                {/* Question dots for desktop */}
+                <div className="hidden md:block">
+                  <QuestionDots
+                    current={currentQuestion}
+                    total={questions.length}
+                    answeredQuestions={answeredQuestions}
+                  />
+                </div>
+
+                {/* Class badge */}
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+                  <span className="font-mono text-xs text-gray-500 uppercase">Class</span>
+                  <span className="font-display font-bold text-white">{selectedClass}</span>
+                </div>
+              </div>
+
+              {/* Error message */}
+              {error && (
+                <div className="mb-4 px-4 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
+                  {error}
+                </div>
+              )}
+
+              {/* Progress bar for mobile */}
+              <div className="md:hidden mb-8">
+                <ProgressIndicator
                   current={currentQuestion}
-                  total={mockQuestions.length}
+                  total={questions.length}
                   answeredQuestions={answeredQuestions}
                 />
               </div>
 
-              {/* Class badge */}
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
-                <span className="font-mono text-xs text-gray-500 uppercase">Class</span>
-                <span className="font-display font-bold text-white">{selectedClass}</span>
+              {/* Question card */}
+              <div className="flex-1 flex items-center justify-center">
+                {(() => {
+                  const currentQuestionData = questions[currentQuestion - 1];
+                  if (!currentQuestionData) return null;
+                  return (
+                    <QuestionCard
+                      question={currentQuestionData}
+                      questionNumber={currentQuestion}
+                      totalQuestions={questions.length}
+                      selectedAnswer={answers[currentQuestionData.id] || null}
+                      onSelectAnswer={handleSelectAnswer}
+                      onNext={handleNextQuestion}
+                      isLastQuestion={currentQuestion === questions.length}
+                    />
+                  );
+                })()}
+              </div>
+
+              {/* Bottom progress for desktop */}
+              <div className="hidden md:block mt-8">
+                <ProgressIndicator
+                  current={currentQuestion}
+                  total={questions.length}
+                  answeredQuestions={answeredQuestions}
+                />
               </div>
             </div>
-
-            {/* Progress bar for mobile */}
-            <div className="md:hidden mb-8">
-              <ProgressIndicator
-                current={currentQuestion}
-                total={mockQuestions.length}
-                answeredQuestions={answeredQuestions}
-              />
-            </div>
-
-            {/* Question card */}
-            <div className="flex-1 flex items-center justify-center">
-              {(() => {
-                const question = mockQuestions[currentQuestion - 1];
-                if (!question) return null;
-                return (
-                  <QuestionCard
-                    question={question}
-                    questionNumber={currentQuestion}
-                    totalQuestions={mockQuestions.length}
-                    selectedAnswer={answers[question.id] || null}
-                    onSelectAnswer={handleSelectAnswer}
-                    onNext={handleNextQuestion}
-                    isLastQuestion={currentQuestion === mockQuestions.length}
-                  />
-                );
-              })()}
-            </div>
-
-            {/* Bottom progress for desktop */}
-            <div className="hidden md:block mt-8">
-              <ProgressIndicator
-                current={currentQuestion}
-                total={mockQuestions.length}
-                answeredQuestions={answeredQuestions}
-              />
-            </div>
-          </div>
           </FocusModeSession>
         )}
 

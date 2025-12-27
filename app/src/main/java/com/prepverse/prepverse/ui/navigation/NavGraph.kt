@@ -12,18 +12,31 @@ import androidx.navigation.compose.composable
 import com.prepverse.prepverse.ui.screens.auth.LoginScreen
 import com.prepverse.prepverse.ui.screens.auth.LoginViewModel
 import com.prepverse.prepverse.ui.screens.dashboard.DashboardScreen
+import com.prepverse.prepverse.ui.screens.focus.FocusModeScreen
 import com.prepverse.prepverse.ui.screens.onboarding.OnboardingScreen
 import com.prepverse.prepverse.ui.screens.onboarding.OnboardingViewModel
+import com.prepverse.prepverse.ui.screens.permission.PermissionScreen
 
 @Composable
 fun PrepVerseNavGraph(
     navController: NavHostController,
-    startDestination: String = Routes.Login.route
+    startDestination: String = Routes.Permissions.route
 ) {
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        // Permission screen - must be completed before accessing the app
+        composable(Routes.Permissions.route) {
+            PermissionScreen(
+                onAllPermissionsGranted = {
+                    navController.navigate(Routes.Login.route) {
+                        popUpTo(Routes.Permissions.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(Routes.Login.route) {
             val viewModel: LoginViewModel = hiltViewModel()
             val uiState by viewModel.uiState.collectAsState()
@@ -83,7 +96,9 @@ fun PrepVerseNavGraph(
         }
 
         composable(Routes.FocusMode.route) {
-            // FocusModeScreen()
+            FocusModeScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable(Routes.Progress.route) {

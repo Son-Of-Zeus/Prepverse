@@ -43,6 +43,9 @@ fun OnboardingScreen(
     onNextQuestion: () -> Unit,
     onFinishOnboarding: () -> Unit
 ) {
+    // Track if quiz is in assessment mode for focus protection
+    val isQuizActive = uiState.step == OnboardingStep.ASSESSMENT
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -60,11 +63,24 @@ fun OnboardingScreen(
                 onSelectClass = onSelectClass,
                 onStart = onStartAssessment
             )
-            OnboardingStep.ASSESSMENT -> AssessmentStep(
-                uiState = uiState,
-                onSelectAnswer = onSelectAnswer,
-                onNextQuestion = onNextQuestion
-            )
+            OnboardingStep.ASSESSMENT -> {
+                // Wrap assessment in focus protection
+                QuizFocusProtection(
+                    isQuizActive = true,
+                    onQuizTerminated = onFinishOnboarding
+                ) { focusState, onStartProtection ->
+                    // Only show assessment if focus protection is confirmed
+                    if (focusState.isActive || !focusState.showWarningDialog) {
+                        AssessmentStep(
+                            uiState = uiState,
+                            onSelectAnswer = onSelectAnswer,
+                            onNextQuestion = onNextQuestion,
+                            violations = focusState.violations,
+                            maxViolations = focusState.maxViolations
+                        )
+                    }
+                }
+            }
             OnboardingStep.RESULTS -> ResultsStep(
                 uiState = uiState,
                 onFinish = onFinishOnboarding
@@ -309,7 +325,9 @@ private fun ClassCard(
 private fun AssessmentStep(
     uiState: OnboardingUiState,
     onSelectAnswer: (String) -> Unit,
-    onNextQuestion: () -> Unit
+    onNextQuestion: () -> Unit,
+    violations: Int = 0,
+    maxViolations: Int = 3
 ) {
     val currentQuestion = uiState.questions.getOrNull(uiState.currentQuestionIndex)
         ?: return
@@ -319,7 +337,7 @@ private fun AssessmentStep(
             .fillMaxSize()
             .padding(24.dp)
     ) {
-        // Header with timer and progress
+        // Header with timer, progress, and violations
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -332,8 +350,33 @@ private fun AssessmentStep(
                 color = TextPrimary
             )
 
-            // Timer
-            AssessmentTimer(timeSeconds = uiState.timeRemainingSeconds)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Violations indicator (only show if there are violations)
+                if (violations > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(
+                                Error.copy(alpha = 0.1f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "$violations/$maxViolations",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Error,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Timer
+                AssessmentTimer(timeSeconds = uiState.timeRemainingSeconds)
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))

@@ -5,6 +5,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Focus Mode Permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
     <application
         android:name=".PrepVerseApp"
         android:allowBackup="true"
@@ -43,6 +52,28 @@
                     android:path="/callback" />
             </intent-filter>
         </activity>
+
+        <!-- Focus Mode Services -->
+        <service
+            android:name=".services.FocusModeService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="focus_mode_timer" />
+        </service>
+
+        <service
+            android:name=".services.FocusAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/focus_accessibility_config" />
+        </service>
 
     </application>
 

@@ -1,6 +1,7 @@
 package com.prepverse.prepverse.ui.navigation
 
 sealed class Routes(val route: String) {
+    data object Permissions : Routes("permissions")
     data object Login : Routes("login")
     data object Onboarding : Routes("onboarding")
     data object Dashboard : Routes("dashboard")
