@@ -1,16 +1,181 @@
-import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
 import { useDashboard, SuggestedTopic } from '../hooks/useDashboard';
 import { useAuth } from '../hooks/useAuth';
+import { getRecentPractice, SubjectProgress } from '../utils/progress';
+import { useState, useEffect } from 'react';
+import {
+  LayoutDashboard, Target, Zap, Swords,
+  LogOut, Flame, Star, BookOpen, Clock,
+  ArrowRight, Trophy, Activity
+} from 'lucide-react';
 
-/**
- * Dashboard Page - The home base of the PrepVerse
- *
- * Shows user progress, streak, XP, and suggested topics.
- * Mirrors the Android dashboard data fetching using /api/v1/practice/progress/summary
- */
+// --- Components ---
+
+const SideNav = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth(); // Get user for profile display
+
+  const navItems = [
+
+    { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Start Practice', icon: Target, path: '/practice' },
+    { label: 'Focus Mode', icon: Zap, path: '/focus', disabled: true }, // Placeholder
+    { label: 'Start Battle', icon: Swords, path: '/battle', disabled: true }, // Placeholder
+  ];
+
+  return (
+    <aside className="w-64 flex-shrink-0 border-r border-white/5 bg-slate-900/50 backdrop-blur-xl flex flex-col fixed left-0 top-0 bottom-0 z-50">
+      <div className="p-6 border-b border-white/5 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-prepverse-red to-orange-600 flex items-center justify-center shadow-lg shadow-prepverse-red/20">
+          <span className="font-display text-white font-bold text-xl">P</span>
+        </div>
+        <h1 className="font-display text-xl text-white tracking-wide">PrepVerse</h1>
+      </div>
+
+      <nav className="flex-1 p-4 space-y-2">
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <button
+              key={item.label}
+              onClick={() => !item.disabled && navigate(item.path)}
+              disabled={item.disabled}
+              className={`
+                                w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200
+                                ${isActive
+                  ? 'bg-prepverse-red text-white shadow-glow-sm'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                }
+                                ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                            `}
+            >
+              <item.icon size={20} />
+              <span>{item.label}</span>
+              {item.disabled && <span className="ml-auto text-[10px] uppercase font-bold bg-white/5 px-1.5 py-0.5 rounded text-slate-500">Soon</span>}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="p-4 border-t border-white/5 space-y-4">
+        {/* User Profile Summary */}
+        <div className="flex items-center gap-3 px-2">
+          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-prepverse-red font-bold border border-white/10">
+            {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'S'}
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-sm font-medium text-white truncate">{user?.full_name || 'Student'}</p>
+            <p className="text-xs text-slate-500 truncate">Class {user?.class_level || 10}</p>
+          </div>
+        </div>
+
+        <SignOutButton />
+      </div>
+
+    </aside>
+  );
+};
+
+const SignOutButton = () => {
+  const { logout } = useAuth();
+  return (
+    <button
+      onClick={logout}
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+    >
+      <LogOut size={20} />
+      <span>Sign Out</span>
+    </button>
+  );
+};
+
+const PracticeInsightsWidget = () => {
+  const [recent, setRecent] = useState<SubjectProgress[]>([]);
+  const navigate = useNavigate();
+
+
+  useEffect(() => {
+    // Sync immediately on mount
+    setRecent(getRecentPractice());
+
+    // Listener for storage updates (handling multi-tab sync if needed, but mainly re-mount checks)
+    const handleStorageChange = () => setRecent(getRecentPractice());
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  if (recent.length === 0) return (
+    <div className="glass rounded-3xl p-6 h-full flex flex-col items-center justify-center text-center space-y-4 min-h-[200px]">
+      <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-slate-500">
+        <Activity size={24} />
+      </div>
+      <div>
+        <h3 className="text-white font-medium">No Data Yet</h3>
+        <p className="text-sm text-slate-500 max-w-[200px]">Complete a practice session to see insights here.</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="glass rounded-3xl p-6 h-full border border-white/5">
+      <h3 className="font-display text-white mb-6 flex items-center gap-2">
+        <Activity className="text-prepverse-red" size={20} />
+        Practice Insights
+      </h3>
+
+      <div className="space-y-6">
+        {recent.slice(0, 4).map((item) => (
+          <div key={item.subjectId}>
+            <div className="flex justify-between items-end mb-2">
+              <span className="text-sm font-medium text-slate-300 capitalize">{item.subjectId}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                  {item.averageAccuracy}% Mastery
+                </span>
+                {/* Quick Play Mini Button */}
+                <button
+                  onClick={() => {
+                    navigate('/practice/session/quick-start', {
+                      state: {
+                        config: { difficulty: 'medium', questionCount: 10, timer: '15 Mins' },
+                        topic: {
+                          id: item.subjectId,
+                          subject: item.subjectId,
+                          topic: item.subjectId,
+                          display_name: item.subjectId
+                        }
+                      }
+                    });
+                  }}
+
+                  className="w-6 h-6 rounded-full bg-slate-800 hover:bg-prepverse-red flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                  title="Quick Start"
+                >
+                  <ArrowRight size={12} />
+                </button>
+              </div>
+            </div>
+            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+
+              <div
+                className="h-full bg-gradient-brand rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${item.averageAccuracy}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// --- Page Component ---
+
 export const DashboardPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     isLoading,
     error,
@@ -29,168 +194,187 @@ export const DashboardPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-void flex items-center justify-center">
         <CosmicBackground starCount={50} />
-        <div className="relative z-10 text-center space-y-4">
-          <div className="w-16 h-16 border-4 border-prepverse-red border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-gray-400">Loading your dashboard...</p>
-        </div>
+        <div className="w-12 h-12 border-4 border-prepverse-red border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-void flex items-center justify-center">
-        <CosmicBackground starCount={50} />
-        <div className="relative z-10 text-center space-y-4 max-w-md mx-auto p-8">
-          <div className="text-prepverse-red text-4xl">!</div>
-          <h2 className="font-display text-2xl text-white">Something went wrong</h2>
-          <p className="text-gray-400">{error}</p>
-          <button
-            onClick={refresh}
-            className="px-6 py-3 bg-prepverse-red hover:bg-prepverse-red-light transition-colors rounded-xl text-white font-medium"
-          >
-            Try Again
-          </button>
+      <div className="min-h-screen bg-void flex items-center justify-center text-center p-8">
+        <div className="glass p-8 rounded-3xl max-w-md">
+          <h2 className="text-xl text-white font-display mb-2">Sync Error</h2>
+          <p className="text-slate-400 mb-6">{error}</p>
+          <button onClick={refresh} className="btn-primary">Retry</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-void">
-      <CosmicBackground starCount={80} showGrid />
+    <div className="min-h-screen bg-void text-white font-sans flex overflow-hidden">
+      <CosmicBackground starCount={60} showGrid />
 
-      {/* Header */}
-      <header className="relative z-10 px-6 py-4 flex items-center justify-between border-b border-white/5">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-prepverse-red flex items-center justify-center">
-            <span className="font-display text-white font-bold">P</span>
-          </div>
-          <div>
-            <h1 className="font-display text-xl text-white">PrepVerse</h1>
-            <p className="text-gray-500 text-sm">Welcome back, {user?.full_name || 'Student'}</p>
-          </div>
-        </div>
-        <button
-          onClick={logout}
-          className="text-gray-400 hover:text-white transition-colors text-sm"
-        >
-          Sign out
-        </button>
-      </header>
+      <SideNav />
 
-      {/* Main Content */}
-      <main className="relative z-10 px-6 py-8 max-w-7xl mx-auto">
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            icon={<FireIcon />}
-            value={currentStreak}
-            label="Day Streak"
-            color="text-prepverse-red"
-          />
-          <StatCard
-            icon={<StarIcon />}
-            value={totalXP}
-            label="Total XP"
-            color="text-solar"
-          />
-          <StatCard
-            icon={<BookIcon />}
-            value={totalSessions}
-            label="Sessions"
-            color="text-physics"
-          />
-          <StatCard
-            icon={<TargetIcon />}
-            value={`${overallAccuracy.toFixed(0)}%`}
-            label="Accuracy"
-            color="text-biology"
-          />
-        </div>
+      {/* Main Content Area */}
+      <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen relative z-10 custom-scrollbar">
+        <div className="max-w-6xl mx-auto space-y-8 pb-10">
 
-        {/* Study Time */}
-        <div className="glass rounded-2xl p-6 mb-8 animate-fade-in">
+          {/* Welcome Header */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-400 text-sm mb-1">Total Study Time</p>
-              <p className="font-display text-3xl text-white">
-                {formatStudyTime(totalStudyTimeMinutes)}
-              </p>
+              <h2 className="text-3xl font-display text-white">
+                {getTimeGreeting()}, {user?.full_name || 'Student'}
+              </h2>
+
+              <p className="text-slate-400 mt-1">Ready to continue your journey?</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-cosmic/20 flex items-center justify-center">
-              <ClockIcon className="w-6 h-6 text-cosmic" />
+            <div className="flex items-center gap-4">
+              <div className="glass px-4 py-2 rounded-xl flex items-center gap-2 border border-white/5">
+                <Flame className="text-orange-500 fill-orange-500" size={18} />
+                <span className="font-mono font-bold">{currentStreak} Day Streak</span>
+              </div>
             </div>
           </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard icon={<Flame />} value={currentStreak} label="Streak" color="text-orange-500" />
+            <StatCard icon={<Star />} value={totalXP} label="Total XP" color="text-yellow-400" />
+            <StatCard icon={<BookOpen />} value={totalSessions} label="Sessions" color="text-blue-400" />
+            <StatCard icon={<Trophy />} value={`${overallAccuracy.toFixed(0)}%`} label="Accuracy" color="text-emerald-400" />
+          </div>
+
+          {/* Split Section: Continue Learning + Insights */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Column 1: Learning Path (2 cols wide) */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Call to Action Wrapper */}
+              <div className="glass rounded-3xl p-6 border border-white/5">
+                <h3 className="font-display text-xl text-white mb-4">Continue Learning</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Quick Action */}
+                  <button
+                    onClick={() => {
+                      const recent = getRecentPractice();
+                      if (recent.length > 0 && recent[0]) {
+                        const last = recent[0];
+
+                        // Assuming subjectId works as topic ID or mapped correctly
+                        navigate('/practice/session/quick-start', {
+                          state: {
+                            config: { difficulty: 'medium', questionCount: 10, timer: '15 Mins' },
+                            topic: {
+                              id: last.subjectId,
+                              subject: last.subjectId,
+                              topic: last.subjectId,
+                              display_name: last.subjectId
+                            }
+                          }
+                        });
+                      } else {
+                        navigate('/practice');
+                      }
+                    }}
+
+                    className="bg-gradient-to-br from-prepverse-red to-pink-600 rounded-2xl p-5 text-left group relative overflow-hidden shadow-lg shadow-prepverse-red/20 hover:scale-[1.02] transition-transform duration-300"
+                  >
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Target size={80} />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-3 text-white">
+                        <Target size={20} />
+                      </div>
+                      <h4 className="font-bold text-lg text-white mb-1">Quick Practice</h4>
+                      <p className="text-white/80 text-sm">Jump into the arena</p>
+                    </div>
+                  </button>
+
+                  {/* Topics List */}
+                  {continueLearning.slice(0, 3).map((topic, index) => (
+                    <TopicCard key={`${topic.subject}-${topic.topic}`} topic={topic} index={index} />
+                  ))}
+
+                  {continueLearning.length === 0 && (
+                    <div className="bg-white/5 rounded-2xl p-5 flex items-center justify-center text-slate-500 text-sm">
+                      No recent topics found.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Subject Progress */}
+              {Object.keys(subjectScores).length > 0 && (
+                <div className="glass rounded-3xl p-6 border border-white/5">
+                  <h3 className="font-display text-xl text-white mb-4">Subject Mastery</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(subjectScores).map(([subject, score]) => (
+                      <SubjectProgressCard key={subject} subject={subject} score={score} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Column 2: Inputs & Study Time (1 col wide) */}
+            <div className="space-y-6">
+              <PracticeInsightsWidget />
+
+              <div className="glass rounded-3xl p-6 flex flex-col items-center justify-center text-center border border-white/5">
+                <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 text-blue-400">
+                  <Clock size={28} />
+                </div>
+                <h4 className="text-3xl font-display text-white mb-1">{formatStudyTime(totalStudyTimeMinutes)}</h4>
+                <p className="text-slate-500 text-sm">Time Spent Studying</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Suggested Topics */}
+          {suggestedTopics.length > 0 && (
+            <div className="glass rounded-3xl p-6 border border-white/5">
+              <h3 className="font-display text-xl text-white mb-4">Recommended for You</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {suggestedTopics.map((topic, index) => (
+                  <TopicCard
+                    key={`${topic.subject}-${topic.topic}`}
+                    topic={topic}
+                    index={index}
+                    suggested
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
-
-        {/* Subject Progress */}
-        {Object.keys(subjectScores).length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-display text-xl text-white mb-4">Subject Progress</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(subjectScores).map(([subject, score]) => (
-                <SubjectProgressCard key={subject} subject={subject} score={score} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Continue Learning */}
-        {continueLearning.length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-display text-xl text-white mb-4">Continue Learning</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {continueLearning.map((topic, index) => (
-                <TopicCard key={`${topic.subject}-${topic.topic}`} topic={topic} index={index} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Suggested Topics */}
-        {suggestedTopics.length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-display text-xl text-white mb-4">Suggested for You</h2>
-            <p className="text-gray-400 text-sm mb-4">Topics you might need more practice on</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {suggestedTopics.map((topic, index) => (
-                <TopicCard
-                  key={`${topic.subject}-${topic.topic}`}
-                  topic={topic}
-                  index={index}
-                  suggested
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Empty State */}
-        {totalSessions === 0 && (
-          <div className="glass rounded-2xl p-12 text-center">
-            <div className="w-20 h-20 rounded-full bg-prepverse-red/20 flex items-center justify-center mx-auto mb-6">
-              <RocketIcon className="w-10 h-10 text-prepverse-red" />
-            </div>
-            <h2 className="font-display text-2xl text-white mb-3">Start Your Journey</h2>
-            <p className="text-gray-400 max-w-md mx-auto mb-6">
-              Begin practicing to see your progress here. Pick a subject and topic to start learning!
-            </p>
-            <button className="px-8 py-4 bg-prepverse-red hover:bg-prepverse-red-light transition-colors rounded-xl text-white font-medium shadow-glow-sm hover:shadow-glow-md">
-              Start Practice
-            </button>
-          </div>
-        )}
       </main>
     </div>
   );
 };
 
-// Helper Functions
 
-/**
- * Format subject name for display (capitalize first letter of each word)
- */
+// --- Helper Components & Logic ---
+
+const getTimeGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const StatCard = ({ icon, value, label, color }: any) => (
+  <div className="glass rounded-2xl p-4 flex items-center gap-4">
+    <div className={`p-3 rounded-xl bg-slate-900/50 ${color}`}>{icon}</div>
+    <div>
+      <p className="font-display text-xl text-white">{value}</p>
+      <p className="text-slate-500 text-xs uppercase tracking-wider font-bold">{label}</p>
+    </div>
+  </div>
+);
+
 function formatSubjectName(subject: string): string {
   return subject
     .split(/[\s_]+/)
@@ -198,104 +382,64 @@ function formatSubjectName(subject: string): string {
     .join(' ');
 }
 
-/**
- * Get subject color class (handles lowercase subject names from API)
- */
 function getSubjectBgColor(subject: string): string {
   const colors: Record<string, string> = {
     mathematics: 'bg-math',
     physics: 'bg-physics',
     chemistry: 'bg-chemistry',
     biology: 'bg-biology',
-    science: 'bg-science', // Class 10 combined science
+    science: 'bg-science',
   };
   return colors[subject.toLowerCase()] || 'bg-cosmic';
 }
 
-/**
- * Get subject border/text color class (handles lowercase subject names from API)
- */
 function getSubjectBorderColor(subject: string): string {
   const colors: Record<string, string> = {
     mathematics: 'border-math text-math',
     physics: 'border-physics text-physics',
     chemistry: 'border-chemistry text-chemistry',
     biology: 'border-biology text-biology',
-    science: 'border-science text-science', // Class 10 combined science
+    science: 'border-science text-science',
   };
   return colors[subject.toLowerCase()] || 'border-cosmic text-cosmic';
 }
 
-// Helper Components
-
-interface StatCardProps {
-  icon: React.ReactNode;
-  value: number | string;
-  label: string;
-  color: string;
-}
-
-const StatCard: React.FC<StatCardProps> = ({ icon, value, label, color }) => (
-  <div className="glass rounded-2xl p-4 animate-fade-in">
-    <div className={`${color} mb-2`}>{icon}</div>
-    <p className="font-display text-2xl text-white">{value}</p>
-    <p className="text-gray-400 text-sm">{label}</p>
-  </div>
-);
-
-interface SubjectProgressCardProps {
-  subject: string;
-  score: number;
-}
-
-const SubjectProgressCard: React.FC<SubjectProgressCardProps> = ({ subject, score }) => {
+const SubjectProgressCard = ({ subject, score }: any) => {
   const bgColor = getSubjectBgColor(subject);
   const displayName = formatSubjectName(subject);
-
   return (
-    <div className="glass rounded-xl p-4">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-3 h-3 rounded-full ${bgColor}`} />
-        <span className="text-white font-medium">{displayName}</span>
+    <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-slate-300 font-medium">{displayName}</span>
+        <span className="text-xs font-mono text-slate-500">{score.toFixed(0)}%</span>
       </div>
-      <div className="relative h-2 bg-white/10 rounded-full overflow-hidden">
-        <div
-          className={`absolute inset-y-0 left-0 ${bgColor} rounded-full transition-all duration-500`}
-          style={{ width: `${score}%` }}
-        />
+      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${bgColor}`} style={{ width: `${score}%` }} />
       </div>
-      <p className="text-gray-400 text-sm mt-2">{score.toFixed(0)}% accuracy</p>
     </div>
   );
 };
 
-interface TopicCardProps {
-  topic: SuggestedTopic;
-  index: number;
-  suggested?: boolean;
-}
-
-const TopicCard: React.FC<TopicCardProps> = ({ topic, index, suggested }) => {
+const TopicCard = ({ topic, index, suggested }: any) => {
   const borderColor = getSubjectBorderColor(topic.subject);
   const displaySubject = formatSubjectName(topic.subject);
 
   return (
     <div
-      className={`glass rounded-xl p-5 border-l-4 ${borderColor.split(' ')[0]} hover:bg-hover/50 transition-colors cursor-pointer animate-fade-in`}
-      style={{ animationDelay: `${index * 100}ms` }}
+      className={`glass rounded-2xl p-5 border-l-4 ${borderColor.split(' ')[0]} hover:bg-white/5 transition-all cursor-pointer group`}
     >
       <div className="flex items-start justify-between mb-3">
-        <span className={`text-xs font-mono uppercase ${borderColor.split(' ')[1]}`}>
+        <span className={`text-[10px] font-mono uppercase tracking-widest ${borderColor.split(' ')[1]}`}>
           {displaySubject}
         </span>
         {suggested && (
-          <span className="text-xs bg-prepverse-red/20 text-prepverse-red px-2 py-1 rounded-full">
-            Needs work
+          <span className="text-[10px] bg-prepverse-red/20 text-prepverse-red px-2 py-0.5 rounded uppercase font-bold">
+            Tip
           </span>
         )}
       </div>
-      <h3 className="font-medium text-white mb-2">{topic.displayName}</h3>
-      <div className="relative h-1.5 bg-white/10 rounded-full overflow-hidden">
+      <h3 className="font-medium text-white mb-3 group-hover:text-prepverse-red transition-colors">{topic.displayName}</h3>
+      <div className="relative h-1 bg-white/10 rounded-full overflow-hidden">
         <div
           className="absolute inset-y-0 left-0 bg-white/40 rounded-full"
           style={{ width: `${topic.progress * 100}%` }}
@@ -305,60 +449,11 @@ const TopicCard: React.FC<TopicCardProps> = ({ topic, index, suggested }) => {
   );
 };
 
-// Utility Functions
-
 function formatStudyTime(minutes: number): string {
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return mins > 0 ? `${hours}h ${mins}m` : `${hours} hours`;
 }
 
-// Icons
 
-const FireIcon: React.FC = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 2c.5 4-1.5 6-3 8 2 0 4 1 4 4 0 2-2 4-5 4-2 0-4-1-4-4 0-4 4-6 4-10 0-1 2-2 4-2z" />
-  </svg>
-);
-
-const StarIcon: React.FC = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-  </svg>
-);
-
-const BookIcon: React.FC = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-  </svg>
-);
-
-const TargetIcon: React.FC = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="12" r="6" />
-    <circle cx="12" cy="12" r="2" />
-  </svg>
-);
-
-const ClockIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-
-const RocketIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
-    <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
-    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
-    <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
-  </svg>
-);
-
-export default DashboardPage;

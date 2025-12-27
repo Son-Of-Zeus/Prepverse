@@ -1,41 +1,13 @@
-import { useState, useEffect } from 'react';
-import { LoginPage, OnboardingPage, DashboardPage } from './pages';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults } from './pages';
 import { useAuth } from './hooks/useAuth';
 import './styles/globals.css';
 
-type AppRoute = 'login' | 'onboarding' | 'dashboard';
-
 /**
- * App - Root component with simple routing for demonstration
- *
- * In production, this would use React Router for proper navigation
+ * App - Root component with React Router for navigation
  */
 function App() {
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>('login');
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const { isAuthenticated, isLoading, user } = useAuth();
-
-  // Handle authentication state changes
-  useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        // User is authenticated - check onboarding status
-        if (user?.onboarding_completed || hasCompletedOnboarding) {
-          setCurrentRoute('dashboard');
-        } else {
-          setCurrentRoute('onboarding');
-        }
-      } else {
-        // User is not authenticated, redirect to login
-        setCurrentRoute('login');
-      }
-    }
-  }, [isAuthenticated, isLoading, user, hasCompletedOnboarding]);
-
-  const handleOnboardingComplete = () => {
-    setHasCompletedOnboarding(true);
-    setCurrentRoute('dashboard');
-  };
+  const { isAuthenticated, isLoading, user, refetchUser } = useAuth();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -49,13 +21,75 @@ function App() {
     );
   }
 
+  const handleOnboardingComplete = () => {
+    refetchUser();
+  };
+
   return (
-    <div className="min-h-screen bg-void">
-      {/* Route content */}
-      {currentRoute === 'login' && <LoginPage />}
-      {currentRoute === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
-      {currentRoute === 'dashboard' && <DashboardPage />}
-    </div>
+    <BrowserRouter>
+      <div className="min-h-screen bg-void">
+        <Routes>
+          {/* Public Route */}
+          <Route
+            path="/login"
+            element={!isAuthenticated ? <LoginPage /> : <Navigate to="/dashboard" />}
+          />
+
+          {/* Protected Routes */}
+          <Route
+            path="/onboarding"
+            element={
+              isAuthenticated
+                ? (user?.onboarding_completed ? <Navigate to="/dashboard" /> : <OnboardingPage onComplete={handleOnboardingComplete} />)
+                : <Navigate to="/login" />
+            }
+          />
+
+          <Route
+            path="/dashboard"
+            element={
+              isAuthenticated
+                ? (user?.onboarding_completed ? <DashboardPage /> : <Navigate to="/onboarding" />)
+                : <Navigate to="/login" />
+            }
+          />
+
+          <Route
+            path="/practice"
+            element={
+              isAuthenticated
+                ? (user?.onboarding_completed ? <PracticePage /> : <Navigate to="/onboarding" />)
+                : <Navigate to="/login" />
+            }
+          />
+
+          {/* Dynamic Route for Practice Session */}
+          <Route
+            path="/practice/session/:id"
+            element={
+              isAuthenticated
+                ? (user?.onboarding_completed ? <PracticeSession /> : <Navigate to="/onboarding" />)
+                : <Navigate to="/login" />
+            }
+          />
+
+          <Route
+            path="/practice/results"
+            element={
+              isAuthenticated
+                ? (user?.onboarding_completed ? <PracticeResults /> : <Navigate to="/onboarding" />)
+                : <Navigate to="/login" />
+            }
+          />
+
+          {/* Default Redirect */}
+          <Route
+            path="*"
+            element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />}
+          />
+        </Routes>
+      </div>
+    </BrowserRouter>
   );
 }
 
