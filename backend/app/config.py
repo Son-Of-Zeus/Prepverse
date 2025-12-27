@@ -4,6 +4,8 @@ Loads environment variables for Supabase, Auth0, and Gemini
 """
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import List, Union
+from pydantic import AnyHttpUrl, field_validator
 
 
 class Settings(BaseSettings):
@@ -39,12 +41,20 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
     # CORS Settings
-    CORS_ORIGINS: list[str] = [
-        "http://localhost:3000",
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:3000", 
         "http://localhost:5173",
-        "http://localhost:8081",
-        "exp://localhost:8081"
+        "http://localhost:8081"
     ]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str) and not v.startswith("["):
+            return [i.strip() for i in v.split(",")]
+        elif isinstance(v, (list, str)):
+            return v
+        raise ValueError(v)
 
     # API Settings
     API_V1_PREFIX: str = "/api/v1"
