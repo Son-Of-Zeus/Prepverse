@@ -1,16 +1,17 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
-import { useDashboard, fetchConceptMastery, fetchPerformanceTrend, ConceptMastery, RecentScore } from '../hooks/useDashboard';
+import { useDashboard, fetchConceptMastery, ConceptMastery } from '../hooks/useDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { getRecentPractice, SubjectProgress } from '../utils/progress';
+
 import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
-import { PerformanceTrend } from '../components/dashboard/PerformanceTrend';
 import {
   LayoutDashboard, Target, Zap, Swords,
-  LogOut, Flame, Star, BookOpen, Clock,
-  ArrowRight, Trophy, Activity, TrendingUp
+  LogOut, Flame, Star, BookOpen,
+  ArrowRight, Trophy, Activity, MessageSquare
 } from 'lucide-react';
+import { forumApi } from '../api/forum';
 
 // --- Components ---
 
@@ -22,57 +23,73 @@ const SideNav = () => {
   const navItems = [
     { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Start Practice', icon: Target, path: '/practice' },
+    { label: 'Discussion', icon: MessageSquare, path: '/discussion' },
     { label: 'Focus Mode', icon: Zap, path: '/focus' },
     { label: 'Start Battle', icon: Swords, path: '/battle', disabled: true },
   ];
 
   return (
-    <aside className="w-64 flex-shrink-0 border-r border-white/5 bg-slate-900/50 backdrop-blur-xl flex flex-col fixed left-0 top-0 bottom-0 z-50">
-      <div className="p-6 border-b border-white/5 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-prepverse-red to-orange-600 flex items-center justify-center shadow-lg shadow-prepverse-red/20">
-          <span className="font-display text-white font-bold text-xl">P</span>
-        </div>
-        <h1 className="font-display text-xl text-white tracking-wide">PrepVerse</h1>
-      </div>
+    <>
+      {/* Mobile Sidebar Overlay (could be added later for full mobile support) */}
 
-      <nav className="flex-1 p-4 space-y-2">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <button
-              key={item.label}
-              onClick={() => !item.disabled && navigate(item.path)}
-              disabled={item.disabled}
-              className={`
-                w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200
-                ${isActive
-                  ? 'bg-prepverse-red text-white shadow-glow-sm'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                }
-                ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
-            >
-              <item.icon size={20} />
-              <span>{item.label}</span>
-              {item.disabled && <span className="ml-auto text-[10px] uppercase font-bold bg-white/5 px-1.5 py-0.5 rounded text-slate-500">Soon</span>}
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="p-4 border-t border-white/5 space-y-4">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-prepverse-red font-bold border border-white/10">
-            {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'S'}
+      <aside className="hidden md:flex w-64 flex-shrink-0 border-r border-white/5 bg-slate-950 backdrop-blur-xl flex-col h-screen z-20">
+        <div className="p-6 border-b border-white/5 flex items-center gap-3 flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-prepverse-red to-orange-600 flex items-center justify-center shadow-lg shadow-prepverse-red/20">
+            <span className="font-display text-white font-bold text-xl">P</span>
           </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">{user?.full_name || 'Student'}</p>
-            <p className="text-xs text-slate-500 truncate">Class {user?.class_level || 10}</p>
-          </div>
+          <h1 className="font-display text-xl text-white tracking-wide">PrepVerse</h1>
         </div>
-        <SignOutButton />
+
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+            return (
+              <button
+                key={item.label}
+                onClick={() => !item.disabled && navigate(item.path)}
+                disabled={item.disabled}
+                className={`
+                  w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 flex-shrink-0
+                  ${isActive
+                    ? 'bg-prepverse-red text-white shadow-glow-sm'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }
+                  ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+              >
+                <item.icon size={20} />
+                <span>{item.label}</span>
+                {item.disabled && <span className="ml-auto text-[10px] uppercase font-bold bg-white/5 px-1.5 py-0.5 rounded text-slate-500">Soon</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-white/5 space-y-4 flex-shrink-0 bg-slate-950 backdrop-blur-xl">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-prepverse-red font-bold border border-white/10 flex-shrink-0">
+              {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'S'}
+            </div>
+            <div className="overflow-hidden min-w-0">
+              <p className="text-sm font-medium text-white truncate">{user?.full_name || 'Student'}</p>
+              <p className="text-xs text-slate-500 truncate">Class {user?.class_level || 10}</p>
+            </div>
+          </div>
+          <SignOutButton />
+        </div>
+      </aside>
+
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-slate-950 border-b border-white/5 p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-prepverse-red to-orange-600 flex items-center justify-center shadow-lg shadow-prepverse-red/20">
+            <span className="font-display text-white font-bold text-lg">P</span>
+          </div>
+          <h1 className="font-display text-lg text-white tracking-wide">PrepVerse</h1>
+        </div>
+        {/* Mobile Menu trigger could go here */}
       </div>
-    </aside>
+    </>
   );
 };
 
@@ -113,7 +130,7 @@ const PracticeInsightsWidget = () => {
   );
 
   return (
-    <div className="glass rounded-3xl p-6 h-full border border-white/5">
+    <div className="glass rounded-3xl p-6 border border-white/5">
       <h3 className="font-display text-white mb-6 flex items-center gap-2">
         <Activity className="text-prepverse-red" size={20} />
         Practice Insights
@@ -123,7 +140,7 @@ const PracticeInsightsWidget = () => {
         {recent.slice(0, 4).map((item) => (
           <div key={item.subjectId}>
             <div className="flex justify-between items-end mb-2">
-              <span className="text-sm font-medium text-slate-300 capitalize">{item.subjectId}</span>
+              <span className="text-sm font-medium text-slate-300 capitalize truncate max-w-[120px]" title={item.subjectId}>{item.subjectId}</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
                   {item.averageAccuracy}% Mastery
@@ -162,6 +179,85 @@ const PracticeInsightsWidget = () => {
   );
 };
 
+const RecentDiscussionsWidget = () => {
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Fetch recent posts (page 1, limit 3)
+    forumApi.getPosts(1, 3).then((data: any) => {
+      setPosts(data.posts);
+      setLoading(false);
+    }).catch(err => {
+      console.error("Failed to fetch recent discussions", err);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return (
+    <div className="glass rounded-3xl p-6 h-full border border-white/5 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  return (
+    <div className="glass rounded-3xl p-6 border border-white/5 flex flex-col relative z-20">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="font-display text-white flex items-center gap-2">
+          <MessageSquare className="text-blue-400" size={20} />
+          Recent Discussions
+        </h3>
+        <button
+          onClick={() => navigate('/discussion')}
+          className="text-xs text-blue-400 hover:text-blue-300 font-medium uppercase tracking-wider transition-colors"
+        >
+          View All
+        </button>
+      </div>
+
+      <div className="space-y-4 overflow-hidden">
+        {posts.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 gap-2 min-h-[100px]">
+            <MessageSquare size={24} className="opacity-50" />
+            <p className="text-sm">No discussions yet.</p>
+          </div>
+        ) : (
+          posts.map(post => (
+            <div
+              key={post.id}
+              onClick={() => navigate(`/discussion/${post.id}`)}
+              className="group cursor-pointer bg-white/5 hover:bg-white/10 p-3 rounded-xl transition-colors border border-transparent hover:border-white/10"
+            >
+              <h4 className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors line-clamp-1 mb-1">
+                {post.title}
+              </h4>
+              <div className="flex items-center gap-3 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <span className="font-bold text-slate-400">{post.upvotes}</span> votes
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  {post.comment_count} answers
+                </span>
+                <span>•</span>
+                <span className="truncate max-w-[80px]">{post.category}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <button
+        onClick={() => navigate('/discussion')}
+        className="mt-4 w-full py-3 bg-prepverse-red/10 hover:bg-prepverse-red/20 text-prepverse-red font-bold rounded-xl transition-all border border-prepverse-red/20 hover:border-prepverse-red/50 flex items-center justify-center gap-2"
+      >
+        <span>Ask a Question</span>
+      </button>
+    </div>
+  );
+};
+
 // --- Page Component ---
 
 export const DashboardPage: React.FC = () => {
@@ -176,7 +272,6 @@ export const DashboardPage: React.FC = () => {
     suggestedTopics,
     totalSessions,
     overallAccuracy,
-    totalStudyTimeMinutes,
     subjectScores,
     refresh,
   } = useDashboard();
@@ -184,9 +279,7 @@ export const DashboardPage: React.FC = () => {
   // State for SWOT analysis and performance trend
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [concepts, setConcepts] = useState<ConceptMastery[]>([]);
-  const [performanceData, setPerformanceData] = useState<RecentScore[]>([]);
   const [isLoadingConcepts, setIsLoadingConcepts] = useState(false);
-  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
 
   // Get available subjects from subjectScores
   const availableSubjects = useMemo(() => Object.keys(subjectScores), [subjectScores]);
@@ -203,15 +296,6 @@ export const DashboardPage: React.FC = () => {
       setSelectedSubject(availableSubjects[0] || '');
     }
   }, [selectedSubject, availableSubjects]);
-
-  // Fetch performance trend data
-  useEffect(() => {
-    setIsLoadingPerformance(true);
-    fetchPerformanceTrend().then((data) => {
-      setPerformanceData(data);
-      setIsLoadingPerformance(false);
-    });
-  }, []);
 
   if (isLoading) {
     return (
@@ -241,7 +325,8 @@ export const DashboardPage: React.FC = () => {
       <SideNav />
 
       {/* Main Content Area */}
-      <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen relative z-10 custom-scrollbar">
+      {/* Main Content Area */}
+      <main className="flex-1 p-8 pt-20 md:pt-8 overflow-y-auto h-screen relative z-10 custom-scrollbar">
         <div className="max-w-6xl mx-auto space-y-8 pb-10">
 
           {/* Welcome Header */}
@@ -253,6 +338,7 @@ export const DashboardPage: React.FC = () => {
               <p className="text-slate-400 mt-1">Ready to continue your journey?</p>
             </div>
             <div className="flex items-center gap-4">
+
               <div className="glass px-4 py-2 rounded-xl flex items-center gap-2 border border-white/5">
                 <Flame className="text-orange-500 fill-orange-500" size={18} />
                 <span className="font-mono font-bold">{currentStreak} Day Streak</span>
@@ -261,7 +347,7 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={<Flame />} value={currentStreak} label="Streak" color="text-orange-500" />
             <StatCard icon={<Star />} value={totalXP} label="Total XP" color="text-yellow-400" />
             <StatCard icon={<BookOpen />} value={totalSessions} label="Sessions" color="text-blue-400" />
@@ -324,93 +410,77 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* SWOT Analysis Section */}
+              {availableSubjects.length > 0 && (
+                <div className="glass rounded-3xl p-6 border border-white/5 relative z-10">
+                  <h3 className="font-display text-xl text-white mb-4 flex items-center gap-2">
+                    <Zap className="text-violet-400" size={20} />
+                    SWOT Analysis
+                  </h3>
+                  {/* Subject Tabs */}
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {availableSubjects.map((subject) => {
+                      const isSelected = selectedSubject === subject;
+                      const bgColor = getSubjectBgColor(subject);
+                      return (
+                        <button
+                          key={subject}
+                          onClick={() => setSelectedSubject(subject)}
+                          className={`
+                            px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200
+                            ${isSelected
+                              ? `${bgColor} text-white shadow-lg`
+                              : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/5'
+                            }
+                          `}
+                        >
+                          {formatSubjectName(subject)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {isLoadingConcepts ? (
+                    <div className="p-12 text-center">
+                      <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-slate-400">Analyzing your performance...</p>
+                    </div>
+                  ) : (
+                    <SWOTAnalysis concepts={concepts} streak={currentStreak} />
+                  )}
+                </div>
+              )}
+
             </div>
 
             {/* Column 2: Insights & Study Time (1 col wide) */}
             <div className="space-y-6">
               <PracticeInsightsWidget />
+              <RecentDiscussionsWidget />
 
-              <div className="glass rounded-3xl p-6 flex flex-col items-center justify-center text-center border border-white/5">
-                <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 text-blue-400">
-                  <Clock size={28} />
+              {/* Recommended for You Widget */}
+              {suggestedTopics.length > 0 && (
+                <div className="glass rounded-3xl p-6 border border-white/5 relative z-10 flex flex-col">
+                  <h3 className="font-display text-white mb-6 flex items-center gap-2">
+                    <Target className="text-purple-400" size={20} />
+                    Recommended
+                  </h3>
+                  <div className="space-y-4">
+                    {suggestedTopics.slice(0, 3).map((topic) => (
+                      <TopicCard
+                        key={`${topic.subject}-${topic.topic}`}
+                        topic={topic}
+                        suggested
+                      />
+                    ))}
+                  </div>
                 </div>
-                <h4 className="text-3xl font-display text-white mb-1">{formatStudyTime(totalStudyTimeMinutes)}</h4>
-                <p className="text-slate-500 text-sm">Time Spent Studying</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Recommended for You */}
-          {suggestedTopics.length > 0 && (
-            <div className="glass rounded-3xl p-6 border border-white/5">
-              <h3 className="font-display text-xl text-white mb-4">Recommended for You</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {suggestedTopics.map((topic) => (
-                  <TopicCard
-                    key={`${topic.subject}-${topic.topic}`}
-                    topic={topic}
-                    suggested
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* SWOT Analysis Section */}
-          {availableSubjects.length > 0 && (
-            <div className="glass rounded-3xl p-6 border border-white/5">
-              <h3 className="font-display text-xl text-white mb-4 flex items-center gap-2">
-                <Zap className="text-violet-400" size={20} />
-                SWOT Analysis
-              </h3>
-              {/* Subject Tabs */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                {availableSubjects.map((subject) => {
-                  const isSelected = selectedSubject === subject;
-                  const bgColor = getSubjectBgColor(subject);
-                  return (
-                    <button
-                      key={subject}
-                      onClick={() => setSelectedSubject(subject)}
-                      className={`
-                        px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200
-                        ${isSelected
-                          ? `${bgColor} text-white shadow-lg`
-                          : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/5'
-                        }
-                      `}
-                    >
-                      {formatSubjectName(subject)}
-                    </button>
-                  );
-                })}
-              </div>
-              {isLoadingConcepts ? (
-                <div className="p-12 text-center">
-                  <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-slate-400">Analyzing your performance...</p>
-                </div>
-              ) : (
-                <SWOTAnalysis concepts={concepts} streak={currentStreak} />
               )}
             </div>
-          )}
-
-          {/* Performance Trajectory Section */}
-          <div className="glass rounded-3xl p-6 border border-white/5">
-            <h3 className="font-display text-xl text-white mb-4 flex items-center gap-2">
-              <TrendingUp className="text-cyan-400" size={20} />
-              Performance Trajectory
-            </h3>
-            {isLoadingPerformance ? (
-              <div className="p-12 text-center">
-                <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-slate-400">Calculating trajectory...</p>
-              </div>
-            ) : (
-              <PerformanceTrend data={performanceData} />
-            )}
           </div>
+
+
+
+
 
         </div>
       </main>
@@ -495,12 +565,5 @@ const TopicCard = ({ topic, suggested }: any) => {
     </div>
   );
 };
-
-function formatStudyTime(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours} hours`;
-}
 
 export default DashboardPage;

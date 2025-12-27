@@ -16,7 +16,7 @@ email-validator==2.3.0
 fastapi==0.127.1
 fsspec==2025.12.0
 google-auth==2.45.0
-google-genai==1.56.0
+google-genai
 h11==0.16.0
 h2==4.3.0
 hpack==4.1.0

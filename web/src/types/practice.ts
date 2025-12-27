@@ -11,7 +11,8 @@ export interface Question {
     explanation?: string;
     subject: string;
     topic: string;
-    difficulty: 'easy' | 'medium' | 'hard';
+    difficulty: 'easy' | 'medium' | 'hard' | 'adaptive';
+
     mark?: number;
 }
 

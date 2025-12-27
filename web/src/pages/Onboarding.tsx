@@ -16,7 +16,9 @@ import {
   OnboardingAnswer,
   OnboardingResponse,
 } from '../api/onboarding';
+import { School, setUserSchool } from '../api/schools';
 import { useAuth } from '../hooks/useAuth';
+import { SchoolSelector } from '../components/onboarding/SchoolSelector';
 
 // Types for QuestionCard component (options with id/text format)
 interface Option {
@@ -33,7 +35,7 @@ interface Question {
 }
 
 // Combined step type (includes loading/submitting from main)
-type OnboardingStep = 'welcome' | 'class-select' | 'loading' | 'quiz' | 'submitting' | 'results';
+type OnboardingStep = 'welcome' | 'class-select' | 'school-select' | 'loading' | 'quiz' | 'submitting' | 'results';
 
 // Session tracking types (from sanghu)
 interface InterruptionEvent {
@@ -88,6 +90,7 @@ const convertToQuestionCardFormat = (backendQuestions: OnboardingQuestion[]): Qu
 export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) => {
   const [step, setStep] = useState<OnboardingStep>('welcome');
   const [selectedClass, setSelectedClass] = useState<10 | 12 | null>(null);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(1);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isTimerPaused] = useState(false);
@@ -158,12 +161,30 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     setSelectedClass(classLevel);
   };
 
+  const handleClassContinue = () => {
+    setStep('school-select');
+  };
+
+  const handleSchoolSelect = (_schoolId: string | null, school: School | null) => {
+    setSelectedSchool(school);
+  };
+
   // Combined handleStartAssessment: fetches from backend AND initializes focus tracking
   const handleStartAssessment = async () => {
     if (!selectedClass) return;
 
     setStep('loading');
     setError(null);
+
+    // Save selected school if any
+    if (selectedSchool) {
+      try {
+        await setUserSchool(selectedSchool.id);
+      } catch (err) {
+        console.warn('Failed to save school selection:', err);
+        // Continue anyway as this is optional/secondary
+      }
+    }
 
 
 
@@ -280,6 +301,9 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     setViolations(0);
     setQuestions([]);
     setBackendQuestions([]);
+    // Don't reset selectedSchool or selectedClass to allow quick restart? 
+    // Actually, usually it resets everything. Let's keep class selected maybe.
+    // User logic: setStep('class-select') means they have to click Continue again.
   };
 
   // Session tracking: Update actual duration periodically (from sanghu)
@@ -566,8 +590,66 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                 `}
               >
                 <button
-                  onClick={handleStartAssessment}
+                  onClick={handleClassContinue}
                   className="group relative w-full px-8 py-4 bg-prepverse-red text-white font-semibold text-lg rounded-2xl overflow-hidden transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-prepverse-red focus:ring-offset-4 focus:ring-offset-void"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                  <span className="relative flex items-center justify-center gap-3">
+                    Continue to School Selection
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 'school-select' && (
+          <div className="min-h-screen flex flex-col items-center justify-center p-8">
+            <div className="w-full max-w-xl space-y-8">
+              {/* Header */}
+              <div className="text-center space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+                  <span className="w-2 h-2 rounded-full bg-prepverse-red animate-pulse" />
+                  <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">
+                    Step 2 of 2
+                  </span>
+                </div>
+                <h2 className="font-display text-display-md text-white">
+                  Find your school
+                </h2>
+                <p className="text-gray-400 text-body-lg max-w-md mx-auto">
+                  Connect with your school community and compete in leaderboards.
+                </p>
+              </div>
+
+              {/* School Selector */}
+              <div className="bg-surface/50 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-card">
+                <SchoolSelector
+                  value={selectedSchool?.id || null}
+                  onChange={handleSchoolSelect}
+                  placeholder="Search by name, district, or city..."
+                />
+              </div>
+
+              {/* Navigation */}
+              <div className="flex flex-col gap-4">
+                <button
+                  onClick={handleStartAssessment}
+                  disabled={!selectedSchool}
+                  className={`
+                    group relative w-full px-8 py-4 
+                    bg-prepverse-red text-white font-semibold text-lg 
+                    rounded-2xl overflow-hidden 
+                    transition-all duration-300 
+                    focus:outline-none focus:ring-2 focus:ring-prepverse-red focus:ring-offset-4 focus:ring-offset-void
+                    ${!selectedSchool
+                      ? 'opacity-50 cursor-not-allowed grayscale'
+                      : 'hover:scale-105'
+                    }
+                  `}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                   <span className="relative flex items-center justify-center gap-3">
@@ -576,6 +658,13 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
                       <path d="M5 12h14M12 5l7 7-7 7" />
                     </svg>
                   </span>
+                </button>
+
+                <button
+                  onClick={handleStartAssessment}
+                  className="text-gray-500 hover:text-white text-sm transition-colors py-2"
+                >
+                  Skip for now
                 </button>
               </div>
             </div>
