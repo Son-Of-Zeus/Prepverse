@@ -22,7 +22,8 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface LocationState {
     config: {
-        difficulty: 'easy' | 'medium' | 'hard' | null;
+        difficulty: 'easy' | 'medium' | 'hard' | 'adaptive' | null;
+
         questionCount: number | null;
         timer: string | null;
     };
@@ -138,7 +139,8 @@ export const PracticeSession = () => {
                 const startPayload = {
                     subject: state.topic.subject,
                     topic: state.topic.topic,
-                    difficulty: state.config.difficulty || null, // Allow adaptive if null
+                    difficulty: state.config.difficulty === 'adaptive' ? null : state.config.difficulty,
+
                     question_count: state.config.questionCount || 10,
                     time_limit_seconds: state.config.timer === 'No Timer' ? null :
                         (state.config.timer === '15 Mins' ? 900 :
