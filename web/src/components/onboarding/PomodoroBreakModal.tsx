@@ -59,16 +59,16 @@ export const PomodoroBreakModal: React.FC<PomodoroBreakModalProps> = ({
 
           <div className="relative z-10 flex flex-col items-center text-center space-y-8">
 
-            {/* Typography: Distinctive Layout */}
+            {/* Typography: Clock Timer Layout */}
             <div className="space-y-2 animate-slide-up">
               <span className="font-mono text-xs tracking-[0.2em] text-solar uppercase opacity-80">
-                {isComplete ? 'Session Resumed' : 'Restoration Phase'}
+                {isComplete ? 'Ready to Resume' : 'Break Timer'}
               </span>
               <h2 className="font-display text-4xl md:text-5xl text-white leading-tight">
                 {isComplete ? (
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Ready?</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Session Start</span>
                 ) : (
-                  <span className="italic">Breathe.</span>
+                  <span className="">Relax.</span>
                 )}
               </h2>
             </div>

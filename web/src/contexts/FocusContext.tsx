@@ -143,33 +143,19 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
     }, [isActive, isPaused, showViolationModal]);
 
-    // Timer Tick
     useEffect(() => {
-        if (isActive && !isPaused && !showViolationModal) {
+        if (isActive && !isPaused && !showViolationModal && !isOnBreak) {
             intervalRef.current = setInterval(() => {
                 setTimeRemaining((prev) => {
                     if (prev <= 1) {
                         clearInterval(intervalRef.current!);
 
-                        if (isOnBreak) {
-                            // Break Ended -> Start next Focus Session
-                            setIsOnBreak(false);
-                            const nextSessionTime = settings.pomodoroMinutes * 60;
-                            setTimeRemaining(nextSessionTime);
-                            setTotalTime(nextSessionTime);
-                            // Auto-start next session or pause? 
-                            // Standard Pomodoro usually auto-starts or waits.
-                            // Let's keep it active for continuous flow as requested "not terminated".
-                            return nextSessionTime;
-                        } else {
-                            // Focus Session Ended -> Start Break
-                            setIsOnBreak(true);
-                            const breakTime = settings.breakMinutes * 60;
-                            setTimeRemaining(breakTime);
-                            setTotalTime(breakTime);
-                            // It is still "Active" (the session is active), but state swiched to break.
-                            return breakTime;
-                        }
+                        // Focus Session Ended -> Trigger Break
+                        // We do not manage break time in context anymore, we pause and let UI handle it.
+                        setIsOnBreak(true);
+                        // Optional: Set time to next session immediately or wait for resume?
+                        // Let's wait for resume (skipBreak) to set the time, so the background stays static.
+                        return 0;
                     }
                     return prev - 1;
                 });
@@ -181,7 +167,7 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [isActive, isPaused, showViolationModal, isOnBreak, settings]);
+    }, [isActive, isPaused, showViolationModal, isOnBreak]);
 
     // Manually skip break
     const skipBreak = () => {
