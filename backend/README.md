@@ -5,8 +5,9 @@ FastAPI backend for PrepVerse - CBSE exam preparation platform with AI-powered q
 ## Tech Stack
 
 - **FastAPI** - Modern Python web framework
-- **Supabase** - PostgreSQL database and authentication
-- **Auth0** - JWT token validation
+- **Supabase** - PostgreSQL database
+- **Auth0** - OAuth authentication (server-side for web, JWT for mobile)
+- **Authlib** - OAuth client library
 - **Google Gemini Flash 3** - AI-powered question generation
 - **Pydantic** - Data validation and settings management
 
@@ -18,11 +19,13 @@ backend/
 │   ├── api/
 │   │   └── v1/
 │   │       ├── router.py          # Main API router
-│   │       ├── auth.py            # Authentication endpoints
+│   │       ├── auth.py            # Auth endpoints (login, callback, logout, me)
 │   │       ├── onboarding.py      # Onboarding assessment
 │   │       └── questions.py       # Question generation
 │   ├── core/
-│   │   ├── security.py            # Auth0 JWT validation
+│   │   ├── security.py            # Dual auth (cookie + Bearer token)
+│   │   ├── oauth.py               # Authlib OAuth client for Auth0
+│   │   ├── session.py             # Session cookie utilities
 │   │   └── gemini.py              # Gemini AI client
 │   ├── db/
 │   │   └── session.py             # Supabase client
@@ -75,7 +78,11 @@ cp .env.example .env
 - `SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_KEY` - Your Supabase anon/service key
 - `AUTH0_DOMAIN` - Your Auth0 tenant domain
+- `AUTH0_CLIENT_ID` - Your Auth0 application client ID
+- `AUTH0_CLIENT_SECRET` - Your Auth0 application client secret
 - `AUTH0_AUDIENCE` - Your Auth0 API identifier
+- `SESSION_SECRET_KEY` - Random string for signing session cookies
+- `FRONTEND_URL` - Frontend URL for OAuth redirects (e.g., `http://localhost:5173`)
 - `GEMINI_API_KEY` - Your Google Gemini API key
 
 4. **Run the development server:**
@@ -108,7 +115,17 @@ Once running, visit:
 ## API Endpoints
 
 ### Authentication
-- `GET /api/v1/auth/me` - Get current user profile
+
+The backend supports dual authentication:
+- **Web**: Server-side OAuth with HTTP-only session cookies
+- **Mobile**: Bearer JWT tokens from Auth0 SDK
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/auth/login` | GET | Redirect to Auth0/Google OAuth |
+| `/api/v1/auth/callback` | GET | OAuth callback, sets session cookie |
+| `/api/v1/auth/logout` | POST | Clear session cookie |
+| `/api/v1/auth/me` | GET | Get current user profile (cookie or Bearer) |
 
 ### Onboarding Assessment
 - `GET /api/v1/onboarding/questions` - Get 10 random questions based on user's class
@@ -168,11 +185,12 @@ create table user_attempts (
 
 ## Features
 
-1. **Auth0 JWT Validation** - Secure authentication using Auth0 tokens
-2. **Onboarding Assessment** - 10 random questions from 100-question pool
-3. **AI Question Generation** - Dynamic question generation using Gemini
-4. **Performance Tracking** - Track user answers and identify weak topics
-5. **Personalized Recommendations** - AI-powered study plan generation
+1. **Dual Authentication** - Server-side OAuth (web) + JWT validation (mobile)
+2. **HTTP-only Session Cookies** - Secure cookie-based auth for web clients
+3. **Onboarding Assessment** - 10 random questions from 100-question pool
+4. **AI Question Generation** - Dynamic question generation using Gemini
+5. **Performance Tracking** - Track user answers and identify weak topics
+6. **Personalized Recommendations** - AI-powered study plan generation
 
 ## Development
 

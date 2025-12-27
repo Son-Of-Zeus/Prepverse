@@ -2,327 +2,206 @@
 
 ## Overview
 
-Complete Auth0 integration has been implemented for the PrepVerse web application. The integration includes Google OAuth authentication, automatic token management, and API client configuration.
-
-## Files Created/Modified
-
-### New Files Created
-
-1. **`/Users/vpranav/Desktop/Dev/PEC/web/src/lib/auth0.ts`**
-   - Auth0Provider configuration
-   - Environment variable validation
-   - Connection constants (Google OAuth)
-   - Redirect URI configuration
-   - Token storage settings (memory-based for security)
-
-2. **`/Users/vpranav/Desktop/Dev/PEC/web/src/hooks/useAuth.ts`**
-   - Custom authentication hook
-   - Wraps Auth0's useAuth0 with app-specific logic
-   - Provides: `loginWithGoogle()`, `logout()`, `getAccessToken()`
-   - Exports: `isAuthenticated`, `isLoading`, `user`, `error`
-   - Type-safe user interface
-
-3. **`/Users/vpranav/Desktop/Dev/PEC/web/src/api/client.ts`**
-   - Axios instance with base URL configuration
-   - Request interceptor for automatic Bearer token injection
-   - Response interceptor for error handling
-   - Token getter function setup
-   - Comprehensive error logging
-
-4. **`/Users/vpranav/Desktop/Dev/PEC/web/src/api/onboarding.ts`**
-   - API functions for onboarding flow
-   - `getOnboardingStatus()` - Check if user completed onboarding
-   - `getOnboardingQuestions(class)` - Fetch questions for student class
-   - `submitOnboardingAnswers(answers)` - Submit user responses
-   - `skipOnboarding()` - Optional skip functionality
-   - Full TypeScript types for API responses
-
-5. **`/Users/vpranav/Desktop/Dev/PEC/web/src/pages/Callback.tsx`**
-   - Auth0 callback redirect handler
-   - Loading state with animated spinner
-   - Error handling with user-friendly messages
-   - Automatic redirection after successful auth
-
-6. **`/Users/vpranav/Desktop/Dev/PEC/web/.env.example`**
-   - Environment variable template
-   - Comments explaining each variable
-   - Required Auth0 configuration values
-   - API URL configuration
-
-7. **`/Users/vpranav/Desktop/Dev/PEC/web/AUTH0_SETUP.md`**
-   - Comprehensive setup guide
-   - Step-by-step Auth0 configuration
-   - Google OAuth setup instructions
-   - Troubleshooting section
-   - Security features documentation
-
-8. **`/Users/vpranav/Desktop/Dev/PEC/web/INSTALLATION.md`**
-   - Quick start guide
-   - Installation checklist
-   - Testing instructions
-   - Backend requirements
-   - Common issues and solutions
-
-### Modified Files
-
-1. **`/Users/vpranav/Desktop/Dev/PEC/web/src/main.tsx`**
-   - Added Auth0Provider wrapper
-   - Imported auth0Config from lib
-   - Wrapped App component with authentication context
-
-2. **`/Users/vpranav/Desktop/Dev/PEC/web/src/App.tsx`**
-   - Added useAuth hook integration
-   - Set up API client token getter
-   - Added authentication state handling
-   - Added loading state for auth initialization
-   - Added CallbackPage route
-   - Automatic redirect logic based on auth state
-
-3. **`/Users/vpranav/Desktop/Dev/PEC/web/src/pages/Login.tsx`**
-   - Integrated useAuth hook
-   - Replaced mock login with actual Auth0 loginWithGoogle()
-   - Added error handling
-   - Maintained existing UI/UX design
-
-4. **`/Users/vpranav/Desktop/Dev/PEC/web/src/pages/index.ts`**
-   - Added CallbackPage export
+PrepVerse uses **server-side OAuth** for web authentication. The backend handles all OAuth token exchange with Auth0, and the web frontend uses HTTP-only session cookies for authentication.
 
 ## Architecture
+
+### Why Server-Side OAuth?
+
+- **Security**: Tokens never exposed to JavaScript (XSS protection)
+- **Simplicity**: No client-side token management needed
+- **Cookie-based**: Automatic credential handling by browser
 
 ### Authentication Flow
 
 ```
-User Clicks "Sign in with Google"
+User clicks "Sign in with Google"
          ↓
-loginWithGoogle() called
+Frontend redirects to backend /api/v1/auth/login
          ↓
-Redirect to Auth0 + Google
+Backend redirects to Auth0 with Google connection
          ↓
 User authenticates with Google
          ↓
-Auth0 redirects to /callback
+Auth0 redirects to backend /api/v1/auth/callback
          ↓
-Callback.tsx handles response
+Backend exchanges auth code for tokens
          ↓
-Auth0Provider processes tokens
+Backend creates/updates user in database
          ↓
-App.tsx detects isAuthenticated
+Backend sets HTTP-only session cookie
          ↓
-Redirect to onboarding page
+Backend redirects to frontend (onboarding or dashboard)
+         ↓
+All subsequent API requests include cookie automatically
 ```
 
-### API Request Flow
+## Files Overview
 
+### Frontend (`web/src/`)
+
+| File | Purpose |
+|------|---------|
+| `hooks/useAuth.ts` | Custom auth hook - redirects to backend for login |
+| `api/client.ts` | Axios instance with `withCredentials: true` |
+| `api/onboarding.ts` | Onboarding API functions |
+| `pages/Login.tsx` | Login page with Google sign-in button |
+| `App.tsx` | Auth state management and routing |
+
+### Backend (`backend/app/`)
+
+| File | Purpose |
+|------|---------|
+| `core/oauth.py` | Authlib OAuth client for Auth0 |
+| `core/session.py` | Session token creation/validation |
+| `core/security.py` | Dual auth support (cookie + Bearer) |
+| `api/v1/auth.py` | Auth endpoints (login, callback, logout, me) |
+
+## Usage
+
+### Login
+
+```typescript
+import { useAuth } from './hooks/useAuth';
+
+function LoginButton() {
+  const { loginWithGoogle } = useAuth();
+  return <button onClick={loginWithGoogle}>Sign in with Google</button>;
+}
 ```
-Component calls API function
-         ↓
-api/onboarding.ts makes request
-         ↓
-apiClient (axios) intercepts request
-         ↓
-Gets token via getAccessToken()
-         ↓
-Adds "Authorization: Bearer {token}"
-         ↓
-Request sent to backend
-         ↓
-Response processed and returned
+
+### Check Auth State
+
+```typescript
+import { useAuth } from './hooks/useAuth';
+
+function Profile() {
+  const { isAuthenticated, user, isLoading } = useAuth();
+
+  if (isLoading) return <div>Loading...</div>;
+  if (!isAuthenticated) return <div>Please log in</div>;
+
+  return <div>Welcome, {user?.full_name}!</div>;
+}
 ```
 
-### Token Management
+### Make API Calls
 
-- **Storage**: Memory-based (not localStorage for security)
-- **Refresh**: Automatic refresh token rotation enabled
-- **Scope**: `openid profile email offline_access`
-- **Audience**: Scoped to your API identifier
-- **Expiration**: Handled automatically by Auth0 SDK
+```typescript
+import { apiClient } from './api/client';
+
+// Cookie is automatically included - no token management needed!
+const response = await apiClient.get('/onboarding/status');
+```
+
+### Logout
+
+```typescript
+import { useAuth } from './hooks/useAuth';
+
+function LogoutButton() {
+  const { logout } = useAuth();
+  return <button onClick={logout}>Sign out</button>;
+}
+```
 
 ## Security Features
 
-1. **XSS Protection**
-   - Tokens stored in memory (not localStorage)
-   - No exposure via JavaScript access
+1. **HTTP-only Cookies**
+   - Session token stored in HTTP-only cookie
+   - Not accessible via JavaScript (XSS protection)
+   - Secure flag enabled in production
 
-2. **Token Refresh**
-   - Automatic silent refresh using refresh tokens
-   - No user interruption for re-authentication
+2. **Server-side Token Exchange**
+   - Auth0 tokens never reach the browser
+   - Backend handles all OAuth operations
+   - Client secret securely stored on server
 
-3. **Connection Restriction**
-   - Only Google OAuth2 allowed
-   - No username/password authentication
+3. **Session Management**
+   - Signed session tokens (itsdangerous)
+   - 7-day expiration
+   - Secure cookie attributes
 
-4. **Audience Scoping**
-   - Access tokens scoped to specific API
-   - Prevents token misuse across services
+4. **CORS + Credentials**
+   - Vite proxy in dev ensures same-origin
+   - `withCredentials: true` for cookie handling
 
-5. **HTTPS Enforcement**
-   - Production should use HTTPS only
-   - Secure token transmission
+## Environment Variables
 
-## Configuration Required
-
-### Environment Variables (.env)
+### Frontend (`web/.env`)
 
 ```env
-VITE_AUTH0_DOMAIN=your-tenant.auth0.com
-VITE_AUTH0_CLIENT_ID=your-client-id
-VITE_AUTH0_AUDIENCE=https://api.prepverse.com
-VITE_API_URL=http://localhost:8080/api
+VITE_API_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-### Auth0 Dashboard Settings
+Note: No Auth0 credentials needed in frontend - backend handles OAuth.
 
-1. **Application Type**: Single Page Application
-2. **Allowed Callback URLs**: `http://localhost:5173/callback`, `https://yourdomain.com/callback`
-3. **Allowed Logout URLs**: `http://localhost:5173`, `https://yourdomain.com`
-4. **Allowed Web Origins**: `http://localhost:5173`, `https://yourdomain.com`
-5. **Social Connection**: Google OAuth enabled
-6. **API**: Created with identifier matching VITE_AUTH0_AUDIENCE
+### Backend (`backend/.env`)
 
-## Dependencies to Install
-
-```bash
-npm install @auth0/auth0-react axios
+```env
+AUTH0_DOMAIN=your-tenant.auth0.com
+AUTH0_CLIENT_ID=your-client-id
+AUTH0_CLIENT_SECRET=your-client-secret
+AUTH0_AUDIENCE=https://api.prepverse.com
+SESSION_SECRET_KEY=generate-a-secure-random-string
+FRONTEND_URL=http://localhost:5173
 ```
 
-Both packages are required:
-- `@auth0/auth0-react`: Official Auth0 React SDK
-- `axios`: HTTP client for API calls with interceptors
+## Development
 
-## Usage Examples
+### With Vite Proxy (Recommended)
 
-### 1. Using Authentication in Components
+The Vite dev server proxies `/api` requests to the backend, making cookies work seamlessly:
 
 ```typescript
-import { useAuth } from './hooks/useAuth';
-
-function MyComponent() {
-  const { isAuthenticated, user, loginWithGoogle, logout } = useAuth();
-
-  if (!isAuthenticated) {
-    return <button onClick={loginWithGoogle}>Login</button>;
-  }
-
-  return (
-    <div>
-      <p>Welcome, {user?.name}!</p>
-      <button onClick={logout}>Logout</button>
-    </div>
-  );
-}
+// vite.config.ts
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        cookieDomainRewrite: 'localhost',
+      },
+    },
+  },
+});
 ```
 
-### 2. Making Authenticated API Calls
+### Testing the Flow
 
-```typescript
-import { getOnboardingStatus, getOnboardingQuestions } from './api/onboarding';
+1. Start backend: `cd backend && ./run.sh`
+2. Start frontend: `cd web && npm run dev`
+3. Visit `http://localhost:5173`
+4. Click "Sign in with Google"
+5. After authentication, you'll be redirected to onboarding or dashboard
 
-// These automatically include the auth token
-const status = await getOnboardingStatus();
-const questions = await getOnboardingQuestions('10');
-```
+## Troubleshooting
 
-### 3. Getting Access Token Directly
+### Cookie not being set
 
-```typescript
-import { useAuth } from './hooks/useAuth';
+- Ensure backend `FRONTEND_URL` matches your frontend URL
+- Check that Vite proxy is configured correctly
+- Verify `withCredentials: true` in axios client
 
-function MyComponent() {
-  const { getAccessToken } = useAuth();
+### Redirect loop
 
-  const handleCustomRequest = async () => {
-    const token = await getAccessToken();
-    // Use token for custom API call
-  };
-}
-```
+- Check Auth0 callback URL is set to backend: `http://localhost:8000/api/v1/auth/callback`
+- Verify `SESSION_SECRET_KEY` is set in backend `.env`
 
-## Testing Checklist
+### CORS errors
 
-- [ ] Install dependencies: `npm install`
-- [ ] Copy `.env.example` to `.env`
-- [ ] Configure Auth0 application
-- [ ] Enable Google social connection
-- [ ] Create Auth0 API
-- [ ] Update `.env` with credentials
-- [ ] Start dev server: `npm run dev`
-- [ ] Test login flow
-- [ ] Verify token in API requests
-- [ ] Test logout functionality
-- [ ] Check error handling
-- [ ] Verify callback redirect works
+- Ensure backend CORS allows frontend origin
+- Check that Vite proxy is working (requests should go through `/api`)
 
-## Backend Integration Requirements
+### 401 Unauthorized
 
-Your backend must:
-
-1. **Validate JWT Tokens**
-   - Use Auth0's JWKS endpoint
-   - Verify token signature
-   - Check audience matches your API identifier
-   - Verify issuer is your Auth0 domain
-
-2. **Accept Authorization Header**
-   ```
-   Authorization: Bearer {access_token}
-   ```
-
-3. **Implement Onboarding Endpoints**
-   - GET `/onboarding/status`
-   - GET `/onboarding/questions?class={10|12}`
-   - POST `/onboarding/submit`
-   - POST `/onboarding/skip`
-
-4. **CORS Configuration**
-   - Allow origin: `http://localhost:5173` (dev) and your production domain
-   - Allow headers: `Content-Type, Authorization`
-   - Allow methods: `GET, POST, PUT, DELETE, OPTIONS`
-
-## Next Steps
-
-1. **Install Dependencies**
-   ```bash
-   cd /Users/vpranav/Desktop/Dev/PEC/web
-   npm install
-   ```
-
-2. **Configure Auth0**
-   - Follow steps in AUTH0_SETUP.md
-   - Set up environment variables
-
-3. **Update Backend**
-   - Implement JWT validation
-   - Create onboarding endpoints
-   - Configure CORS
-
-4. **Test Integration**
-   - Complete login flow
-   - Test API calls
-   - Verify token validation
-
-5. **Production Deployment**
-   - Update Auth0 URLs
-   - Configure production environment
-   - Enable HTTPS
-
-## Additional Notes
-
-- The implementation maintains the existing UI/UX design
-- All components are TypeScript-typed for safety
-- Error handling is comprehensive with console logging
-- The code follows React best practices
-- Comments are included for clarity
-- The integration is production-ready (after Auth0 setup)
-
-## Support & Documentation
-
-- **Auth0 React SDK**: https://auth0.com/docs/libraries/auth0-react
-- **Auth0 Dashboard**: https://manage.auth0.com
-- **Setup Guide**: See AUTH0_SETUP.md
-- **Installation Guide**: See INSTALLATION.md
+- Cookie may have expired (7-day max age)
+- Try logging out and back in
+- Check browser dev tools > Application > Cookies
 
 ---
 
-**Status**: ✅ Implementation Complete
-
-All files have been created and are ready for use. Follow the installation guide to complete the setup.
+**Status**: Server-side OAuth implementation complete

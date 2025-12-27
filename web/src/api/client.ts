@@ -9,14 +9,8 @@ import axios, { AxiosInstance } from 'axios';
  * - Error handling interceptor
  */
 
-// Validate API URL
-const apiUrl = import.meta.env.VITE_API_URL;
-
-if (!apiUrl) {
-  throw new Error(
-    'Missing VITE_API_URL environment variable. Please check your .env file'
-  );
-}
+// API URL - empty means use relative path (Vite proxy in dev)
+const apiUrl = import.meta.env.VITE_API_URL || '';
 
 /**
  * Create axios instance with base configuration

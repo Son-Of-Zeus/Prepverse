@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Frontend URL (for OAuth redirects)
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Android deep link callback URL
+    ANDROID_CALLBACK_URL: str = "prepverse://auth/callback"
+
     # Google Gemini Settings
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-1.5-flash"

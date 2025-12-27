@@ -83,10 +83,10 @@
 
 #### Auth0 Application Settings
 ```
-Application Type: Single Page Application (for Web)
+Application Type: Regular Web Application (for server-side OAuth)
                   Native (for Android)
 Allowed Callback URLs:
-  - Web: http://localhost:5173/callback, https://prepverse.app/callback
+  - Web: http://localhost:8000/api/v1/auth/callback (backend handles OAuth)
   - Android: prepverse://callback
 Allowed Logout URLs:
   - Web: http://localhost:5173, https://prepverse.app
@@ -94,6 +94,8 @@ Allowed Logout URLs:
 Allowed Web Origins:
   - http://localhost:5173, https://prepverse.app
 ```
+
+Note: Web uses server-side OAuth flow where the backend handles token exchange and sets HTTP-only cookies.
 
 #### Auth0 API Settings
 ```
@@ -111,16 +113,64 @@ Permissions:
 
 ### 3.2 Auth Flow
 
+#### Web (Server-Side OAuth with Cookies)
 ```
 ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
-│  User   │     │ Client  │     │  Auth0  │     │ Backend │
+│  User   │     │   Web   │     │ Backend │     │  Auth0  │
 └────┬────┘     └────┬────┘     └────┬────┘     └────┬────┘
      │               │               │               │
      │  Click Login  │               │               │
      │──────────────>│               │               │
      │               │               │               │
-     │               │  Redirect to  │               │
-     │               │  Auth0 /authorize              │
+     │               │ GET /auth/login               │
+     │               │──────────────>│               │
+     │               │               │               │
+     │               │               │ Redirect to   │
+     │               │               │ Auth0/Google  │
+     │               │               │──────────────>│
+     │               │               │               │
+     │      Google OAuth Consent     │               │
+     │<──────────────────────────────────────────────│
+     │               │               │               │
+     │  Grant Access │               │               │
+     │──────────────────────────────────────────────>│
+     │               │               │               │
+     │               │               │ Callback with │
+     │               │               │ auth code     │
+     │               │               │<──────────────│
+     │               │               │               │
+     │               │               │ Exchange code │
+     │               │               │ for tokens    │
+     │               │               │──────────────>│
+     │               │               │               │
+     │               │               │<──────────────│
+     │               │               │ Tokens        │
+     │               │               │               │
+     │               │ Set HTTP-only │               │
+     │               │ session cookie│               │
+     │               │<──────────────│               │
+     │               │               │               │
+     │  Redirect to  │               │               │
+     │  dashboard    │               │               │
+     │<──────────────│               │               │
+     │               │               │               │
+     │               │ API requests  │               │
+     │               │ (cookie auto- │               │
+     │               │ included)     │               │
+     │               │──────────────>│               │
+```
+
+#### Android (Client-Side OAuth with Bearer Tokens)
+```
+┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
+│  User   │     │ Android │     │  Auth0  │     │ Backend │
+└────┬────┘     └────┬────┘     └────┬────┘     └────┬────┘
+     │               │               │               │
+     │  Click Login  │               │               │
+     │──────────────>│               │               │
+     │               │               │               │
+     │               │ Auth0 SDK     │               │
+     │               │ login()       │               │
      │               │──────────────>│               │
      │               │               │               │
      │    Google OAuth Consent       │               │
@@ -129,83 +179,72 @@ Permissions:
      │  Grant Access │               │               │
      │──────────────────────────────>│               │
      │               │               │               │
-     │               │  Callback with│               │
-     │               │  auth code    │               │
+     │               │ Access Token  │               │
      │               │<──────────────│               │
      │               │               │               │
-     │               │  Exchange for │               │
-     │               │  tokens       │               │
-     │               │──────────────>│               │
-     │               │               │               │
-     │               │  ID + Access  │               │
-     │               │  Tokens       │               │
-     │               │<──────────────│               │
-     │               │               │               │
-     │               │  API Request  │               │
-     │               │  with Bearer  │               │
-     │               │  Token        │               │
+     │               │ API requests  │               │
+     │               │ with Bearer   │               │
+     │               │ token         │               │
      │               │───────────────────────────────>│
      │               │               │               │
-     │               │               │  Validate JWT │
-     │               │               │  with Auth0   │
-     │               │               │  JWKS         │
-     │               │               │<──────────────│
+     │               │               │ Validate JWT  │
+     │               │               │ with JWKS     │
      │               │               │               │
-     │               │  Response     │               │
+     │               │ Response      │               │
      │               │<──────────────────────────────│
 ```
 
-### 3.3 JWT Validation (Backend)
+### 3.3 Backend Authentication (Dual Auth)
+
+The backend supports both authentication methods:
+1. **HTTP-only cookies** for web clients
+2. **Bearer JWT tokens** for mobile clients
 
 ```python
 # backend/app/core/security.py
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
-import httpx
-from functools import lru_cache
+from typing import Optional
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-@lru_cache()
-def get_jwks():
-    """Fetch and cache Auth0 JWKS"""
-    response = httpx.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json")
-    return response.json()
-
-async def verify_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+async def get_current_user_flexible(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    prepverse_session: Optional[str] = Cookie(default=None),
 ) -> dict:
-    token = credentials.credentials
-    jwks = get_jwks()
+    """
+    Unified authentication that accepts either:
+    1. HTTP-only session cookie (web frontend)
+    2. Bearer JWT token (mobile apps)
 
-    try:
-        unverified_header = jwt.get_unverified_header(token)
-        rsa_key = {}
-        for key in jwks["keys"]:
-            if key["kid"] == unverified_header["kid"]:
-                rsa_key = {
-                    "kty": key["kty"],
-                    "kid": key["kid"],
-                    "use": key["use"],
-                    "n": key["n"],
-                    "e": key["e"]
-                }
+    Tries cookie first, then falls back to Bearer token.
+    """
+    # Try cookie-based auth first (web)
+    session_cookie = prepverse_session or request.cookies.get("prepverse_session")
+    if session_cookie:
+        user_data = verify_session_token(session_cookie)
+        if user_data:
+            return user_data
 
-        payload = jwt.decode(
-            token,
-            rsa_key,
-            algorithms=["RS256"],
-            audience=AUTH0_API_AUDIENCE,
-            issuer=f"https://{AUTH0_DOMAIN}/"
-        )
-        return payload
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
+    # Try Bearer token auth (mobile)
+    if credentials and credentials.credentials:
+        payload = validate_jwt_token(credentials.credentials)
+        if payload:
+            return {
+                "user_id": payload.get("sub"),
+                "email": payload.get("email"),
+                "auth_method": "bearer"
+            }
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated"
+    )
 ```
+
+See `backend/app/core/security.py` for full implementation.
 
 ---
 
@@ -1139,5 +1178,5 @@ Base URL: `https://api.prepverse.app/api/v1`
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2024-12-24*
+*Document Version: 1.1*
+*Last Updated: 2025-12-25*

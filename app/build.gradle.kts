@@ -18,21 +18,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Auth0 Configuration - Replace with your actual values
-        manifestPlaceholders["auth0Domain"] = "YOUR_AUTH0_DOMAIN"
-        manifestPlaceholders["auth0Scheme"] = "prepverse"
-
-        buildConfigField("String", "AUTH0_DOMAIN", "\"YOUR_AUTH0_DOMAIN\"")
-        buildConfigField("String", "AUTH0_CLIENT_ID", "\"YOUR_AUTH0_CLIENT_ID\"")
-        buildConfigField("String", "AUTH0_SCHEME", "\"prepverse\"")
-        // For development, use 10.0.2.2 (Android emulator localhost) or your local IP
-        // For production, use: "https://api.prepverse.app"
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
     }
 
     buildTypes {
+        debug {
+            // Development: Android emulator localhost
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
+        }
         release {
+            // Production: Replace with your deployed backend URL
+            buildConfigField("String", "API_BASE_URL", "\"https://api.prepverse.app\"")
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -87,8 +82,11 @@ dependencies {
     implementation(libs.bundles.network)
     ksp(libs.moshi.kotlin.codegen)
 
-    // Auth0
-    implementation(libs.auth0)
+    // Browser (Chrome Custom Tabs for OAuth)
+    implementation(libs.androidx.browser)
+
+    // Security (EncryptedSharedPreferences)
+    implementation(libs.androidx.security.crypto)
 
     // Coroutines
     implementation(libs.bundles.coroutines)

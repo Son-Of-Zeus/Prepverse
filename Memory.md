@@ -275,15 +275,17 @@ backend/
 
 ## Key Files Quick Reference
 
-### Authentication (Server-Side OAuth)
+### Authentication (Server-Side OAuth - All Platforms)
 | File | Purpose |
 |------|---------|
-| `backend/app/core/security.py` | Cookie + JWT validation |
+| `backend/app/core/security.py` | Cookie + session token Bearer validation |
 | `backend/app/core/oauth.py` | Authlib OAuth client for Auth0 |
-| `backend/app/core/session.py` | Session cookie utilities |
-| `backend/app/api/v1/auth.py` | Auth endpoints (login, callback, logout, me) |
-| `web/src/hooks/useAuth.ts` | Auth hook (redirect-based, no SDK) |
-| `app/.../data/remote/AuthManager.kt` | Auth0 Android SDK wrapper |
+| `backend/app/core/session.py` | Session token creation/validation |
+| `backend/app/api/v1/auth.py` | Auth endpoints (login?platform=, callback, logout, me) |
+| `web/src/hooks/useAuth.ts` | Auth hook (redirect-based, uses cookies) |
+| `app/.../data/remote/AuthManager.kt` | Chrome Custom Tabs OAuth, TokenStorage |
+| `app/.../data/local/TokenStorage.kt` | Encrypted token persistence |
+| `app/.../AuthCallbackActivity.kt` | Deep link handler for prepverse://auth/callback |
 
 ### Onboarding (10 questions from 100)
 | File | Purpose |
@@ -428,7 +430,9 @@ Instead of searching, check these files directly:
 
 | Looking for... | Check this file |
 |----------------|-----------------|
-| Auth0 setup | `web/src/lib/auth0.ts`, `app/.../di/AuthModule.kt` |
+| Web auth | `web/src/hooks/useAuth.ts`, `web/src/api/client.ts` |
+| Backend auth | `backend/app/core/security.py`, `backend/app/api/v1/auth.py` |
+| Android auth | `app/.../data/remote/AuthManager.kt`, `app/.../di/AuthModule.kt` |
 | API client | `web/src/api/client.ts`, `app/.../data/remote/api/PrepVerseApi.kt` |
 | Navigation | `web/src/App.tsx`, `app/.../ui/navigation/NavGraph.kt` |
 | Theme/Colors | `web/tailwind.config.js`, `app/.../ui/theme/Theme.kt` |
@@ -503,6 +507,7 @@ cd web && npm run dev
 |------|---------|
 | `PrepVerseApp.kt` | Hilt Application class |
 | `MainActivity.kt` | Single Activity host with Compose |
+| `AuthCallbackActivity.kt` | Deep link handler for OAuth callback |
 
 ### Theme (`ui/theme/`)
 | File | Purpose |
@@ -529,7 +534,8 @@ cd web && npm run dev
 ### Data Layer (`data/`)
 | File | Purpose |
 |------|---------|
-| `remote/AuthManager.kt` | Auth0 SDK wrapper with Google OAuth |
+| `local/TokenStorage.kt` | Encrypted token storage (EncryptedSharedPreferences) |
+| `remote/AuthManager.kt` | Server-side OAuth via Chrome Custom Tabs |
 | `remote/api/PrepVerseApi.kt` | Retrofit API interface for backend calls |
 | `remote/api/dto/UserDtos.kt` | User profile DTOs |
 | `remote/api/dto/QuestionDtos.kt` | Question-related DTOs |
@@ -641,13 +647,6 @@ cd web && npm run dev
 ## Recent Updates & Fixes
 
 ### 2024-12-24 Session 2
-- **Web Auth0 Integration**: Complete Auth0 + Google OAuth integration
-  - Added Auth0Provider wrapper in `main.tsx`
-  - Created `useAuth` hook for authentication
-  - Created API client with automatic Bearer token injection
-  - Created Callback page for Auth0 redirect handling
-  - Updated `Login.tsx` with actual Google sign-in
-  - Added onboarding API functions
 - **FastAPI Backend**: Complete backend structure created
   - Auth0 JWT validation using JWKS
   - Gemini Flash 3 client for AI
@@ -724,6 +723,37 @@ cd web && npm run dev
 - **Dev Config**: API base URL set to `http://10.0.2.2:8000` for Android emulator
   - Uses `10.0.2.2` which maps to host localhost from emulator
 
+### 2024-12-25 - Android Server-Side OAuth Migration
+- **Goal**: Migrate Android from client-side Auth0 SDK to server-side OAuth (matching web)
+- **Auth Flow Now Unified**:
+  - Android opens Chrome Custom Tabs → Backend `/auth/login?platform=android`
+  - Backend redirects to Auth0 Universal Login (hosted by Auth0)
+  - Auth0 redirects back to Backend `/auth/callback`
+  - Backend creates session token and redirects to `prepverse://auth/callback?token=xxx`
+  - Android receives deep link, stores token securely
+
+- **Backend Changes**:
+  - `config.py`: Added `ANDROID_CALLBACK_URL = "prepverse://auth/callback"`
+  - `auth.py`: Added `platform` param to `/auth/login`, platform-aware callback response
+  - `security.py`: `get_current_user_flexible()` now verifies session tokens as Bearer (not just Auth0 JWT)
+
+- **Android Changes**:
+  - Removed Auth0 SDK dependency
+  - Added `androidx.browser:browser:1.8.0` (Chrome Custom Tabs)
+  - Added `androidx.security:security-crypto:1.1.0-alpha06` (EncryptedSharedPreferences)
+  - New files:
+    - `data/local/TokenStorage.kt` - Encrypted token storage
+    - `AuthCallbackActivity.kt` - Deep link handler for `prepverse://auth/callback`
+  - Rewrote `AuthManager.kt` - Uses Chrome Custom Tabs + TokenStorage
+  - Updated `LoginViewModel.kt` - Observes AuthManager.authState
+  - Updated `AndroidManifest.xml` - New intent filter for deep link
+
+- **Removed**:
+  - Auth0 SDK dependency (`com.auth0.android:auth0`)
+  - Auth0 BuildConfig fields and manifest placeholders
+  - Auth0 RedirectActivity from manifest
+  - Old AuthResult, ProfileResult, LogoutResult sealed classes
+
 ---
 
-*Last Updated: 2024-12-25*
+*Last Updated: 2025-12-25*

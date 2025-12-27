@@ -1,6 +1,7 @@
 package com.prepverse.prepverse.di
 
 import android.content.Context
+import com.prepverse.prepverse.data.local.TokenStorage
 import com.prepverse.prepverse.data.remote.AuthManager
 import dagger.Module
 import dagger.Provides
@@ -15,9 +16,18 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAuthManager(
+    fun provideTokenStorage(
         @ApplicationContext context: Context
+    ): TokenStorage {
+        return TokenStorage(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthManager(
+        @ApplicationContext context: Context,
+        tokenStorage: TokenStorage
     ): AuthManager {
-        return AuthManager(context)
+        return AuthManager(context, tokenStorage)
     }
 }

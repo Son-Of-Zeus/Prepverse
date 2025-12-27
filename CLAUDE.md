@@ -47,11 +47,26 @@ npm run lint                               # ESLint check
 ## Architecture
 
 ### Authentication Flow
-All platforms use **Auth0 with Google OAuth only**. JWT tokens are validated against Auth0's JWKS endpoint.
+All platforms use **Auth0 with Google OAuth only**.
 
-- Web: `@auth0/auth0-react` SDK → `web/src/lib/auth0.ts`
-- Android: Auth0 Android SDK → `app/.../data/remote/AuthManager.kt`
-- Backend: JWT validation via JWKS → `backend/app/core/security.py`
+**Web (Server-Side OAuth with Cookies):**
+- Frontend redirects to backend `/api/v1/auth/login`
+- Backend handles OAuth flow with Auth0 using Authlib
+- On success, backend sets HTTP-only session cookie
+- All API requests include cookie automatically (`withCredentials: true`)
+- No client-side token management needed
+- See: `backend/app/core/oauth.py`, `backend/app/api/v1/auth.py`
+
+**Android (Client-Side OAuth with Bearer Tokens):**
+- Uses Auth0 Android SDK for authentication
+- JWT access tokens sent via `Authorization: Bearer` header
+- See: `app/.../data/remote/AuthManager.kt`
+
+**Backend (Dual Auth Support):**
+- Supports both HTTP-only cookies (web) and Bearer tokens (mobile)
+- `get_current_user_flexible()` tries cookie first, then Bearer token
+- JWT validation via Auth0 JWKS endpoint
+- See: `backend/app/core/security.py`
 
 ### Backend Structure
 ```
@@ -109,13 +124,14 @@ web/src/
 
 ### Backend (`backend/.env`)
 ```
-SUPABASE_URL, SUPABASE_KEY, AUTH0_DOMAIN, AUTH0_AUDIENCE, GEMINI_API_KEY
+SUPABASE_URL, SUPABASE_KEY, AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_AUDIENCE, SESSION_SECRET_KEY, FRONTEND_URL, GEMINI_API_KEY
 ```
 
 ### Web (`web/.env`)
 ```
-VITE_API_URL, VITE_AUTH0_DOMAIN, VITE_AUTH0_CLIENT_ID, VITE_AUTH0_AUDIENCE, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+VITE_API_URL, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 ```
+Note: Web uses server-side OAuth, so Auth0 credentials are only needed in backend.
 
 ### Android
 Auth0 config in `app/build.gradle.kts` (manifestPlaceholders and BuildConfig fields)
@@ -132,7 +148,7 @@ Base: `/api/v1`
 
 | Module | Key Endpoints |
 |--------|---------------|
-| Auth | `/auth/me` |
+| Auth | `/auth/login` (redirect to OAuth), `/auth/callback`, `/auth/logout`, `/auth/me` |
 | Onboarding | `/onboarding/questions`, `/onboarding/submit`, `/onboarding/status` |
 | Questions | `/questions/generate`, `/questions/topics` |
 | Progress | `/progress/dashboard`, `/progress/concepts` |
@@ -147,10 +163,15 @@ API docs available at `http://localhost:8000/docs` when backend is running.
 |---------|---------|
 | Memory file (search first) | `Memory.md` |
 | Full technical spec | `SPEC.md` |
-| Auth0 JWT validation | `backend/app/core/security.py` |
+| Backend OAuth client | `backend/app/core/oauth.py` |
+| Backend session handling | `backend/app/core/session.py` |
+| Backend dual-auth security | `backend/app/core/security.py` |
+| Backend auth endpoints | `backend/app/api/v1/auth.py` |
 | Gemini AI client | `backend/app/core/gemini.py` |
 | Onboarding questions pool | `backend/app/curriculum/onboarding_questions.json` |
 | Web auth hook | `web/src/hooks/useAuth.ts` |
+| Web API client | `web/src/api/client.ts` |
+| Android auth manager | `app/.../data/remote/AuthManager.kt` |
 | Android navigation | `app/.../ui/navigation/NavGraph.kt` |
 | Android theme | `app/.../ui/theme/Theme.kt` |
 

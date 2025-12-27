@@ -18,11 +18,28 @@ settings = get_settings()
 
 
 @router.get("/login")
-async def login(request: Request):
+async def login(request: Request, platform: str = "web"):
     """
     Initiate OAuth flow - redirects to Auth0 with Google connection.
+
+    Args:
+        platform: "web" (default) or "android" - determines callback behavior
     """
-    redirect_uri = request.url_for("auth_callback")
+    # Store platform in session for callback to retrieve
+    request.session["oauth_platform"] = platform
+
+    # Determine callback URL based on platform and environment
+    if settings.DEBUG:
+        if platform == "android":
+            # Android emulator: use direct backend URL (10.0.2.2 = host's localhost)
+            # This URL must be registered in Auth0 allowed callbacks
+            redirect_uri = "http://10.0.2.2:8000/api/v1/auth/callback"
+        else:
+            # Web: requests come through Vite proxy, use frontend URL
+            redirect_uri = f"{settings.FRONTEND_URL}/api/v1/auth/callback"
+    else:
+        redirect_uri = request.url_for("auth_callback")
+
     return await oauth.auth0.authorize_redirect(
         request,
         redirect_uri,
@@ -33,16 +50,29 @@ async def login(request: Request):
 @router.get("/callback", name="auth_callback")
 async def auth_callback(request: Request, db: Client = Depends(get_db)):
     """
-    OAuth callback - exchanges code for tokens, creates session cookie.
+    OAuth callback - exchanges code for tokens.
+    - Web: Sets session cookie and redirects to FRONTEND_URL
+    - Android: Redirects to deep link with session token
     """
+    # Get platform from session (set in /login)
+    platform = request.session.get("oauth_platform", "web")
+
+    # Helper to build error redirect based on platform
+    def error_redirect(error: str):
+        if platform == "android":
+            return RedirectResponse(
+                url=f"{settings.ANDROID_CALLBACK_URL}?error={error}",
+                status_code=status.HTTP_302_FOUND,
+            )
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error={error}",
+            status_code=status.HTTP_302_FOUND,
+        )
+
     try:
         token = await oauth.auth0.authorize_access_token(request)
     except Exception as e:
-        # Redirect to frontend with error
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/login?error=auth_failed",
-            status_code=status.HTTP_302_FOUND,
-        )
+        return error_redirect("auth_failed")
 
     userinfo = token.get("userinfo", {})
     user_id = userinfo.get("sub")
@@ -50,10 +80,7 @@ async def auth_callback(request: Request, db: Client = Depends(get_db)):
     name = userinfo.get("name")
 
     if not user_id:
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/login?error=invalid_user",
-            status_code=status.HTTP_302_FOUND,
-        )
+        return error_redirect("invalid_user")
 
     # Create or update user in database
     try:
@@ -80,10 +107,7 @@ async def auth_callback(request: Request, db: Client = Depends(get_db)):
                 user_data["full_name"] = name
 
     except Exception as e:
-        return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/login?error=db_error",
-            status_code=status.HTTP_302_FOUND,
-        )
+        return error_redirect("db_error")
 
     # Create session token with user data
     session_data = {
@@ -93,9 +117,19 @@ async def auth_callback(request: Request, db: Client = Depends(get_db)):
     }
     session_token = create_session_token(session_data)
 
-    # Redirect to frontend with session cookie
+    needs_onboarding = not user_data.get("onboarding_completed")
+
+    # Platform-specific response
+    if platform == "android":
+        # Android: Redirect to deep link with token
+        redirect_url = f"{settings.ANDROID_CALLBACK_URL}?token={session_token}"
+        if needs_onboarding:
+            redirect_url += "&needs_onboarding=true"
+        return RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
+
+    # Web: Set cookie and redirect to frontend
     redirect_url = settings.FRONTEND_URL
-    if not user_data.get("onboarding_completed"):
+    if needs_onboarding:
         redirect_url = f"{settings.FRONTEND_URL}/onboarding"
 
     response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
@@ -106,6 +140,7 @@ async def auth_callback(request: Request, db: Client = Depends(get_db)):
         secure=not settings.DEBUG,
         samesite="lax",
         max_age=settings.SESSION_MAX_AGE,
+        path="/",  # Important: send cookie for all paths
     )
 
     return response
@@ -119,9 +154,7 @@ async def logout():
     response = JSONResponse(content={"message": "Logged out successfully"})
     response.delete_cookie(
         key=settings.SESSION_COOKIE_NAME,
-        httponly=True,
-        secure=not settings.DEBUG,
-        samesite="lax",
+        path="/",  # Must match the path used when setting the cookie
     )
     return response
 

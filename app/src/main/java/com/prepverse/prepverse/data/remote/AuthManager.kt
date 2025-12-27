@@ -1,129 +1,127 @@
 package com.prepverse.prepverse.data.remote
 
 import android.content.Context
-import com.auth0.android.Auth0
-import com.auth0.android.authentication.AuthenticationAPIClient
-import com.auth0.android.authentication.AuthenticationException
-import com.auth0.android.callback.Callback
-import com.auth0.android.provider.WebAuthProvider
-import com.auth0.android.result.Credentials
-import com.auth0.android.result.UserProfile
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import com.prepverse.prepverse.BuildConfig
+import com.prepverse.prepverse.data.local.TokenStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Manages authentication using server-side OAuth flow.
+ * Opens backend login URL in Chrome Custom Tabs, receives token via deep link.
+ */
 @Singleton
 class AuthManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val tokenStorage: TokenStorage
 ) {
-    private val auth0: Auth0 = Auth0(
-        BuildConfig.AUTH0_CLIENT_ID,
-        BuildConfig.AUTH0_DOMAIN
-    )
+    private val _authState = MutableStateFlow<AuthState>(AuthState.Unknown)
+    val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    private val _credentials = MutableStateFlow<Credentials?>(null)
-    val credentials: StateFlow<Credentials?> = _credentials
-
-    private val _userProfile = MutableStateFlow<UserProfile?>(null)
-    val userProfile: StateFlow<UserProfile?> = _userProfile
+    private val _needsOnboarding = MutableStateFlow(false)
+    val needsOnboarding: StateFlow<Boolean> = _needsOnboarding.asStateFlow()
 
     val isAuthenticated: Boolean
-        get() = _credentials.value != null
+        get() = tokenStorage.hasToken()
 
-    fun loginWithGoogle(activityContext: Context): Flow<AuthResult> = callbackFlow {
-        WebAuthProvider.login(auth0)
-            .withScheme(BuildConfig.AUTH0_SCHEME)
-            .withConnection("google-oauth2")
-            .withScope("openid profile email")
-            .start(activityContext, object : Callback<Credentials, AuthenticationException> {
-                override fun onSuccess(result: Credentials) {
-                    _credentials.value = result
-                    Timber.d("Login successful: ${result.accessToken}")
-                    trySend(AuthResult.Success(result))
-                    close()
-                }
-
-                override fun onFailure(error: AuthenticationException) {
-                    Timber.e(error, "Login failed")
-                    trySend(AuthResult.Error(error.message ?: "Login failed"))
-                    close()
-                }
-            })
-
-        awaitClose { }
+    init {
+        // Check for existing token on startup
+        checkAuthState()
     }
 
-    fun getUserProfile(): Flow<ProfileResult> = callbackFlow {
-        val accessToken = _credentials.value?.accessToken
-        if (accessToken == null) {
-            trySend(ProfileResult.Error("Not authenticated"))
-            close()
-            return@callbackFlow
+    private fun checkAuthState() {
+        _authState.value = if (tokenStorage.hasToken()) {
+            Timber.d("Existing session token found")
+            AuthState.Authenticated
+        } else {
+            Timber.d("No session token found")
+            AuthState.Unauthenticated
         }
-
-        val client = AuthenticationAPIClient(auth0)
-        client.userInfo(accessToken)
-            .start(object : Callback<UserProfile, AuthenticationException> {
-                override fun onSuccess(result: UserProfile) {
-                    _userProfile.value = result
-                    Timber.d("Profile fetched: ${result.email}")
-                    trySend(ProfileResult.Success(result))
-                    close()
-                }
-
-                override fun onFailure(error: AuthenticationException) {
-                    Timber.e(error, "Failed to fetch profile")
-                    trySend(ProfileResult.Error(error.message ?: "Failed to fetch profile"))
-                    close()
-                }
-            })
-
-        awaitClose { }
     }
 
-    fun logout(activityContext: Context): Flow<LogoutResult> = callbackFlow {
-        WebAuthProvider.logout(auth0)
-            .withScheme(BuildConfig.AUTH0_SCHEME)
-            .start(activityContext, object : Callback<Void?, AuthenticationException> {
-                override fun onSuccess(result: Void?) {
-                    _credentials.value = null
-                    _userProfile.value = null
-                    Timber.d("Logout successful")
-                    trySend(LogoutResult.Success)
-                    close()
-                }
+    /**
+     * Initiates login by opening the backend OAuth URL in Chrome Custom Tabs.
+     * The backend will redirect to Auth0 Universal Login, then back to our deep link.
+     */
+    fun loginWithGoogle(activityContext: Context) {
+        _authState.value = AuthState.Loading
 
-                override fun onFailure(error: AuthenticationException) {
-                    Timber.e(error, "Logout failed")
-                    trySend(LogoutResult.Error(error.message ?: "Logout failed"))
-                    close()
-                }
-            })
+        // Build the backend login URL with platform=android
+        val loginUrl = "${BuildConfig.API_BASE_URL}/api/v1/auth/login?platform=android"
 
-        awaitClose { }
+        Timber.d("Opening login URL: $loginUrl")
+
+        // Open Chrome Custom Tabs
+        val customTabsIntent = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+
+        try {
+            customTabsIntent.launchUrl(activityContext, Uri.parse(loginUrl))
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to launch Chrome Custom Tabs")
+            _authState.value = AuthState.Error("Failed to open login page: ${e.message}")
+        }
     }
 
-    fun getAccessToken(): String? = _credentials.value?.accessToken
+    /**
+     * Called when deep link callback is received with token.
+     * This is invoked by AuthCallbackActivity.
+     */
+    fun handleAuthCallback(token: String, needsOnboarding: Boolean = false) {
+        tokenStorage.saveToken(token)
+        _needsOnboarding.value = needsOnboarding
+        _authState.value = AuthState.Authenticated
+        Timber.d("Auth callback handled, token stored, needsOnboarding=$needsOnboarding")
+    }
+
+    /**
+     * Called when deep link callback contains an error.
+     */
+    fun handleAuthError(error: String) {
+        _authState.value = AuthState.Error(error)
+        Timber.e("Auth callback error: $error")
+    }
+
+    /**
+     * Clears stored token and resets auth state.
+     */
+    fun logout() {
+        tokenStorage.clearToken()
+        _needsOnboarding.value = false
+        _authState.value = AuthState.Unauthenticated
+        Timber.d("Logged out, token cleared")
+    }
+
+    /**
+     * Returns the stored session token for API calls.
+     */
+    fun getAccessToken(): String? = tokenStorage.getToken()
+
+    /**
+     * Clears any error state.
+     */
+    fun clearError() {
+        if (_authState.value is AuthState.Error) {
+            _authState.value = AuthState.Unauthenticated
+        }
+    }
 }
 
-sealed class AuthResult {
-    data class Success(val credentials: Credentials) : AuthResult()
-    data class Error(val message: String) : AuthResult()
-}
-
-sealed class ProfileResult {
-    data class Success(val profile: UserProfile) : ProfileResult()
-    data class Error(val message: String) : ProfileResult()
-}
-
-sealed class LogoutResult {
-    data object Success : LogoutResult()
-    data class Error(val message: String) : LogoutResult()
+/**
+ * Represents the current authentication state.
+ */
+sealed class AuthState {
+    data object Unknown : AuthState()
+    data object Loading : AuthState()
+    data object Authenticated : AuthState()
+    data object Unauthenticated : AuthState()
+    data class Error(val message: String) : AuthState()
 }

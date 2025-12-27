@@ -142,20 +142,30 @@ async def get_current_user_flexible(
     """
     Unified authentication that accepts either:
     1. HTTP-only session cookie (web frontend)
-    2. Bearer JWT token (mobile apps)
+    2. Bearer session token (Android with server-side OAuth)
+    3. Bearer Auth0 JWT token (legacy mobile apps)
 
-    Tries cookie first, then falls back to Bearer token.
+    Tries cookie first, then Bearer session token, then Bearer JWT.
     """
     # Try cookie-based auth first (web)
-    if prepverse_session:
-        user_data = verify_session_token(prepverse_session)
+    # Also check request.cookies directly in case Cookie() param extraction fails
+    session_cookie = prepverse_session or request.cookies.get("prepverse_session")
+    if session_cookie:
+        user_data = verify_session_token(session_cookie)
         if user_data:
-            return user_data
+            return {**user_data, "auth_method": "cookie"}
 
     # Try Bearer token auth (mobile)
     if credentials and credentials.credentials:
+        token = credentials.credentials
+
+        # FIRST: Try to verify as session token (Android server-side OAuth)
+        session_user = verify_session_token(token)
+        if session_user:
+            return {**session_user, "auth_method": "bearer_session"}
+
+        # FALLBACK: Try Auth0 JWT verification (legacy mobile auth)
         try:
-            token = credentials.credentials
             unverified_header = jwt.get_unverified_header(token)
             jwks = get_auth0_public_key()
 
@@ -184,7 +194,7 @@ async def get_current_user_flexible(
                     "user_id": payload.get("sub"),
                     "email": payload.get("email"),
                     "db_id": None,  # Will be fetched from DB if needed
-                    "auth_method": "bearer"
+                    "auth_method": "bearer_jwt"
                 }
         except (JWTError, Exception):
             pass  # Fall through to error

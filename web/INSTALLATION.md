@@ -1,48 +1,49 @@
-# PrepVerse Web - Installation & Quick Start
+# PrepVerse Web - Installation Guide
 
-## Quick Installation
+Complete installation and setup guide for the PrepVerse web application.
+
+## Prerequisites
+
+- Node.js v18+ installed
+- npm installed
+- Backend API running (see `backend/README.md`)
+- Auth0 account configured (see `AUTH0_SETUP.md`)
+
+## Installation
 
 ### 1. Install Dependencies
 
 ```bash
-cd /Users/vpranav/Desktop/Dev/PEC/web
+cd web
 npm install
 ```
 
-This will install all required packages including:
-- `@auth0/auth0-react` - Auth0 React SDK
-- `axios` - HTTP client for API calls
-- All other existing dependencies
+This installs:
+- `react` - UI framework
+- `axios` - HTTP client (with cookie support)
+- `tailwindcss` - Styling
+- Development tools (TypeScript, Vite, ESLint)
 
-### 2. Set Up Environment Variables
+### 2. Configure Environment
 
 ```bash
-# Copy the example environment file
 cp .env.example .env
 ```
 
-Then edit `.env` and add your Auth0 credentials:
+Edit `.env`:
 
 ```env
-VITE_AUTH0_DOMAIN=your-tenant.auth0.com
-VITE_AUTH0_CLIENT_ID=your-client-id
-VITE_AUTH0_AUDIENCE=https://api.prepverse.com
-VITE_API_URL=http://localhost:8080/api
+# Backend API URL
+VITE_API_URL=http://localhost:8000
+
+# Supabase (for real-time features)
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-### 3. Configure Auth0
+> **Note**: Auth0 credentials are NOT needed in the frontend. The backend handles all OAuth operations.
 
-See [AUTH0_SETUP.md](./AUTH0_SETUP.md) for detailed Auth0 configuration steps.
-
-Quick checklist:
-- [ ] Create Auth0 application (Single Page Application type)
-- [ ] Add callback URL: `http://localhost:5173/callback`
-- [ ] Add logout URL: `http://localhost:5173`
-- [ ] Enable Google social connection
-- [ ] Create Auth0 API (for backend integration)
-- [ ] Copy credentials to `.env`
-
-### 4. Start Development Server
+### 3. Start Development Server
 
 ```bash
 npm run dev
@@ -50,152 +51,164 @@ npm run dev
 
 The app will be available at `http://localhost:5173`
 
-## What's Been Implemented
+## Project Structure
 
-### File Structure
 ```
-web/
-├── src/
-│   ├── lib/
-│   │   └── auth0.ts              ✅ Auth0 configuration
-│   ├── hooks/
-│   │   └── useAuth.ts            ✅ Custom auth hook
-│   ├── api/
-│   │   ├── client.ts             ✅ Axios with auth interceptor
-│   │   └── onboarding.ts         ✅ Onboarding API functions
-│   ├── pages/
-│   │   ├── Login.tsx             ✅ Updated with Auth0
-│   │   ├── Callback.tsx          ✅ Auth0 callback handler
-│   │   └── Onboarding.tsx        ✅ Existing onboarding page
-│   ├── App.tsx                   ✅ Updated with auth state
-│   └── main.tsx                  ✅ Wrapped with Auth0Provider
-├── .env.example                  ✅ Environment template
-└── AUTH0_SETUP.md                ✅ Setup documentation
+web/src/
+├── api/
+│   ├── client.ts          # Axios with withCredentials
+│   └── onboarding.ts      # Onboarding API functions
+├── components/
+│   ├── ui/                # Base UI components
+│   └── onboarding/        # Onboarding-specific components
+├── hooks/
+│   └── useAuth.ts         # Authentication hook
+├── pages/
+│   ├── Login.tsx          # Login page
+│   └── Onboarding.tsx     # Onboarding flow
+├── styles/
+│   └── globals.css        # Tailwind imports
+├── App.tsx                # Root component with routing
+└── main.tsx               # Entry point
 ```
 
-### Features Implemented
+## Authentication Architecture
 
-1. **Authentication**
-   - Google OAuth login via Auth0
-   - Automatic token refresh
-   - Secure token storage (memory-based)
-   - Logout functionality
+PrepVerse uses **server-side OAuth** with HTTP-only cookies:
 
-2. **API Integration**
-   - Axios client with automatic Bearer token injection
-   - Error handling interceptors
-   - Onboarding API functions ready to use
+1. No Auth0 SDK in frontend
+2. Login redirects to backend `/api/v1/auth/login`
+3. Backend handles OAuth with Auth0
+4. Backend sets HTTP-only session cookie
+5. All API requests include cookie automatically
 
-3. **User Flow**
-   - Login page with Google sign-in
-   - Auth0 callback handling
-   - Automatic redirect to onboarding after login
-   - Loading states during authentication
+### Key Files
 
-4. **Security**
-   - Tokens stored in memory (not localStorage)
-   - Refresh token rotation enabled
-   - Audience-scoped access tokens
-   - Google-only authentication
+| File | Purpose |
+|------|---------|
+| `hooks/useAuth.ts` | Auth hook - `loginWithGoogle`, `logout`, `user` |
+| `api/client.ts` | Axios with `withCredentials: true` |
+| `vite.config.ts` | Proxy config for `/api` routes |
+
+## Vite Proxy Configuration
+
+The Vite dev server proxies API requests to the backend:
+
+```typescript
+// vite.config.ts
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        cookieDomainRewrite: 'localhost',
+      },
+    },
+  },
+});
+```
+
+This ensures:
+- Cookies work correctly (same-origin)
+- No CORS issues in development
+- API calls go through `/api` path
 
 ## Testing the Integration
 
-### 1. Test Login Flow
+### 1. Start Both Servers
 
-1. Start the dev server: `npm run dev`
-2. Navigate to `http://localhost:5173`
-3. Click "Sign in with Google"
-4. Complete Google authentication
-5. You should be redirected to `/callback` then to onboarding page
-
-### 2. Test API Client
-
-The API client is ready to use. Example:
-
-```typescript
-import { getOnboardingStatus } from './api/onboarding';
-
-// This automatically includes the auth token
-const status = await getOnboardingStatus();
+Terminal 1:
+```bash
+cd backend && ./run.sh
 ```
 
-### 3. Test Auth Hook
-
-```typescript
-import { useAuth } from './hooks/useAuth';
-
-function MyComponent() {
-  const { user, isAuthenticated, logout } = useAuth();
-
-  return (
-    <div>
-      {isAuthenticated && (
-        <>
-          <p>Hello, {user?.name}</p>
-          <button onClick={logout}>Logout</button>
-        </>
-      )}
-    </div>
-  );
-}
+Terminal 2:
+```bash
+cd web && npm run dev
 ```
 
-## Backend Requirements
+### 2. Test Login Flow
 
-Your backend API should:
+1. Visit `http://localhost:5173`
+2. Click "Sign in with Google"
+3. Complete authentication
+4. Verify redirect to onboarding/dashboard
 
-1. **Accept Bearer tokens** in the Authorization header
-2. **Validate Auth0 JWT tokens** using your Auth0 domain and audience
-3. **Handle these endpoints** (as defined in `onboarding.ts`):
-   - `GET /onboarding/status` - Get user's onboarding status
-   - `GET /onboarding/questions?class=10|12` - Get onboarding questions
-   - `POST /onboarding/submit` - Submit onboarding answers
-   - `POST /onboarding/skip` - Skip onboarding
+### 3. Verify Cookie
 
-4. **CORS configuration** should allow:
-   ```
-   Access-Control-Allow-Origin: http://localhost:5173
-   Access-Control-Allow-Headers: Content-Type, Authorization
-   Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-   ```
+Open browser DevTools:
+- Go to Application > Cookies
+- Look for `prepverse_session` cookie
+- It should be HttpOnly
 
-## Next Steps
+### 4. Test API Calls
 
-1. **Configure Auth0** (see AUTH0_SETUP.md)
-2. **Update backend** to validate Auth0 tokens
-3. **Test the full flow** from login to onboarding
-4. **Add React Router** for proper navigation (optional but recommended)
-5. **Implement dashboard** page after onboarding completion
+```typescript
+import { apiClient } from './api/client';
 
-## Common Issues
+const response = await apiClient.get('/auth/me');
+console.log(response.data); // User profile
+```
 
-### Issue: "Missing required Auth0 configuration"
-**Solution**: Ensure all environment variables are set in `.env`
+## Available Scripts
 
-### Issue: Auth0 callback fails
-**Solution**: Verify callback URL matches in both Auth0 Dashboard and your app
+```bash
+npm run dev      # Start dev server
+npm run build    # Production build
+npm run preview  # Preview production build
+npm run lint     # Run ESLint
+```
 
-### Issue: API calls return 401 Unauthorized
-**Solution**:
-- Check that backend is validating Auth0 tokens correctly
-- Verify VITE_AUTH0_AUDIENCE matches your Auth0 API identifier
-- Ensure backend is configured to accept tokens from your Auth0 domain
+## Environment Variables
 
-### Issue: Google login not working
-**Solution**:
-- Verify Google connection is enabled in Auth0
-- Check Google OAuth credentials in Auth0
-- Ensure redirect URIs are configured in Google Cloud Console
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_API_URL` | Yes | Backend API URL |
+| `VITE_SUPABASE_URL` | For realtime | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | For realtime | Supabase anonymous key |
 
-## Getting Help
+## Troubleshooting
 
-- Auth0 Documentation: https://auth0.com/docs
-- Auth0 React SDK: https://auth0.com/docs/libraries/auth0-react
-- PrepVerse Backend API docs: [Link to your backend docs]
+### Login doesn't redirect
 
-## Development Tips
+- Ensure backend is running on port 8000
+- Check browser console for errors
+- Verify `VITE_API_URL` in `.env`
 
-1. **Hot Reload**: The dev server supports hot reload - changes will reflect immediately
-2. **Dev Navigation**: Use the bottom-left dev nav buttons to jump between pages
-3. **Console Logs**: Check browser console for auth errors and API responses
-4. **Network Tab**: Use browser DevTools Network tab to inspect API calls and tokens
+### Cookie not being set
+
+- Check Vite proxy configuration
+- Verify `FRONTEND_URL` in backend `.env`
+- Ensure using `localhost`, not `127.0.0.1`
+
+### 401 Unauthorized on API calls
+
+- Cookie may have expired (7-day max)
+- Try logging out and back in
+- Check if backend is validating cookies correctly
+
+### CORS errors
+
+- Vite proxy should handle this in development
+- Check backend CORS configuration
+- Ensure requests go through `/api` path
+
+## Production Build
+
+```bash
+npm run build
+```
+
+Output in `dist/` folder. Deploy to any static hosting.
+
+For production:
+- Update `VITE_API_URL` to production backend
+- Configure reverse proxy to handle `/api` routes
+- Ensure HTTPS for secure cookies
+
+## Related Documentation
+
+- [QUICKSTART.md](./QUICKSTART.md) - 5-minute setup
+- [AUTH0_SETUP.md](./AUTH0_SETUP.md) - Auth0 configuration
+- [AUTH0_INTEGRATION_SUMMARY.md](./AUTH0_INTEGRATION_SUMMARY.md) - Architecture overview

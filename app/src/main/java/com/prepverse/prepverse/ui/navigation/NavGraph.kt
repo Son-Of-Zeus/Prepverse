@@ -1,8 +1,10 @@
 package com.prepverse.prepverse.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -25,6 +27,12 @@ fun PrepVerseNavGraph(
         composable(Routes.Login.route) {
             val viewModel: LoginViewModel = hiltViewModel()
             val uiState by viewModel.uiState.collectAsState()
+            val context = LocalContext.current
+
+            // Set activity context for OAuth login
+            LaunchedEffect(Unit) {
+                viewModel.setActivityContext(context)
+            }
 
             LoginScreen(
                 uiState = uiState,

@@ -4,11 +4,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.prepverse.prepverse.data.remote.AuthManager
-import com.prepverse.prepverse.data.remote.AuthResult
-import com.prepverse.prepverse.data.remote.ProfileResult
+import com.prepverse.prepverse.data.remote.AuthState
 import com.prepverse.prepverse.data.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,15 +22,13 @@ data class LoginUiState(
     val error: String? = null,
     val userName: String? = null,
     val userEmail: String? = null,
-    val userPictureUrl: String? = null,
     val classLevel: Int? = null
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val authManager: AuthManager,
-    private val authRepository: AuthRepository,
-    @ApplicationContext private val context: Context
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -40,41 +36,77 @@ class LoginViewModel @Inject constructor(
 
     private var activityContext: Context? = null
 
+    init {
+        // Observe auth state changes from AuthManager
+        viewModelScope.launch {
+            authManager.authState.collect { state ->
+                when (state) {
+                    is AuthState.Authenticated -> {
+                        Timber.d("Auth state: Authenticated, fetching profile...")
+                        fetchUserProfileFromBackend()
+                    }
+                    is AuthState.Unauthenticated -> {
+                        Timber.d("Auth state: Unauthenticated")
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isAuthenticated = false,
+                                error = null
+                            )
+                        }
+                    }
+                    is AuthState.Loading -> {
+                        Timber.d("Auth state: Loading")
+                        _uiState.update { it.copy(isLoading = true, error = null) }
+                    }
+                    is AuthState.Error -> {
+                        Timber.e("Auth state: Error - ${state.message}")
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                isAuthenticated = false,
+                                error = state.message
+                            )
+                        }
+                    }
+                    is AuthState.Unknown -> {
+                        // Initial state, do nothing
+                    }
+                }
+            }
+        }
+
+        // Also observe needsOnboarding from AuthManager (set by deep link callback)
+        viewModelScope.launch {
+            authManager.needsOnboarding.collect { needsOnboarding ->
+                _uiState.update { it.copy(needsOnboarding = needsOnboarding) }
+            }
+        }
+    }
+
     fun setActivityContext(context: Context) {
         activityContext = context
     }
 
     fun signInWithGoogle() {
-        val ctx = activityContext ?: return
-
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-
-            authManager.loginWithGoogle(ctx).collect { result ->
-                when (result) {
-                    is AuthResult.Success -> {
-                        Timber.d("Auth0 login success, fetching profile from backend...")
-                        fetchUserProfileFromBackend()
-                    }
-                    is AuthResult.Error -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = result.message
-                            )
-                        }
-                    }
-                }
-            }
+        val ctx = activityContext ?: run {
+            Timber.e("Activity context not set")
+            _uiState.update { it.copy(error = "Unable to start login") }
+            return
         }
+
+        // AuthManager will open Chrome Custom Tabs and update authState
+        authManager.loginWithGoogle(ctx)
     }
 
     /**
-     * Fetch user profile from backend API
-     * This validates the token and gets user data including onboarding status
+     * Fetch user profile from backend API.
+     * This validates the token and gets user data including onboarding status.
      */
     private fun fetchUserProfileFromBackend() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
             authRepository.getCurrentUser()
                 .onSuccess { profile ->
                     Timber.d("Backend profile fetched: ${profile.email}, onboarding: ${profile.onboardingCompleted}")
@@ -90,49 +122,25 @@ class LoginViewModel @Inject constructor(
                     }
                 }
                 .onFailure { error ->
-                    Timber.e(error, "Failed to fetch profile from backend, falling back to Auth0 profile")
-                    // Fall back to Auth0 profile if backend fails
-                    fetchAuth0Profile()
-                }
-        }
-    }
-
-    /**
-     * Fallback: Fetch profile from Auth0 if backend is unavailable
-     */
-    private fun fetchAuth0Profile() {
-        viewModelScope.launch {
-            authManager.getUserProfile().collect { result ->
-                when (result) {
-                    is ProfileResult.Success -> {
-                        val profile = result.profile
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                isAuthenticated = true,
-                                needsOnboarding = true, // Assume needs onboarding if backend is down
-                                userName = profile.name,
-                                userEmail = profile.email,
-                                userPictureUrl = profile.pictureURL
-                            )
-                        }
-                    }
-                    is ProfileResult.Error -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                isAuthenticated = true,
-                                needsOnboarding = true,
-                                error = result.message
-                            )
-                        }
+                    Timber.e(error, "Failed to fetch profile from backend")
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isAuthenticated = true,
+                            // Use needsOnboarding from AuthManager (set by deep link)
+                            error = "Failed to load profile: ${error.message}"
+                        )
                     }
                 }
-            }
         }
     }
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+        authManager.clearError()
+    }
+
+    fun logout() {
+        authManager.logout()
     }
 }

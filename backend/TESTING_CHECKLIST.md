@@ -90,26 +90,77 @@ Visit in browser:
 - http://localhost:8000/redoc (ReDoc)
 
 - [ ] Swagger UI loads correctly
-- [ ] All 10 endpoints visible
+- [ ] All endpoints visible
 - [ ] ReDoc documentation loads
+
+### OAuth Login Flow Test
+
+Test the server-side OAuth flow:
+
+#### 1. Initiate Login
+
+In browser, visit:
+```
+http://localhost:8000/api/v1/auth/login
+```
+
+- [ ] Redirects to Auth0
+- [ ] Shows Google OAuth consent screen
+
+#### 2. Complete OAuth
+
+- [ ] After Google auth, redirects to callback
+- [ ] Callback redirects to frontend URL
+- [ ] `prepverse_session` cookie is set (check DevTools > Application > Cookies)
+- [ ] Cookie is HttpOnly
+- [ ] User created in Supabase `users` table
+
+#### 3. Test Logout
+
+```bash
+curl -X POST -b "prepverse_session=YOUR_COOKIE" \
+  http://localhost:8000/api/v1/auth/logout
+```
+
+- [ ] Returns 200 OK
+- [ ] Cookie is cleared
 
 ### Authenticated Endpoints
 
-First, get an Auth0 token from your frontend or Auth0 dashboard.
+The backend supports two authentication methods:
+1. **Session Cookies** (for web) - Set via OAuth login flow
+2. **Bearer Tokens** (for mobile) - Auth0 JWT from SDK
 
-#### 4. Get Current User Profile
+#### Testing with Session Cookie (Web Flow)
+
+1. Open browser and go to `http://localhost:8000/api/v1/auth/login`
+2. Complete Google OAuth
+3. You'll be redirected to frontend with session cookie set
+4. Use browser dev tools to copy `prepverse_session` cookie
 
 ```bash
-curl -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+# Test with session cookie
+curl -b "prepverse_session=YOUR_COOKIE_VALUE" \
   http://localhost:8000/api/v1/auth/me
 ```
 
-Expected response (first time):
+#### Testing with Bearer Token (Mobile Flow)
+
+Get an Auth0 access token from Auth0 dashboard or your mobile app.
+
+```bash
+curl -H "Authorization: Bearer YOUR_AUTH0_TOKEN" \
+  http://localhost:8000/api/v1/auth/me
+```
+
+#### 4. Get Current User Profile
+
+Expected response:
 ```json
 {
   "id": "uuid-here",
   "email": "user@example.com",
-  "full_name": null,
+  "full_name": "User Name",
   "class_level": 10,
   "onboarding_completed": false,
   "total_questions_attempted": 0,
@@ -120,9 +171,10 @@ Expected response (first time):
 ```
 
 Checks:
-- [ ] Returns 200 OK
+- [ ] Returns 200 OK with cookie auth
+- [ ] Returns 200 OK with Bearer token auth
 - [ ] User created in database (first time)
-- [ ] Email matches token
+- [ ] Email matches authenticated user
 - [ ] Default class_level is 10
 - [ ] onboarding_completed is false
 
@@ -286,17 +338,17 @@ SELECT COUNT(*) FROM user_attempts WHERE user_id = 'your-user-id';
 
 ## Error Handling Tests
 
-### 1. Missing Token
+### 1. Missing Authentication
 
 ```bash
 curl http://localhost:8000/api/v1/auth/me
 ```
 
 Expected:
-- [ ] Returns 403 Forbidden
-- [ ] Error message about missing credentials
+- [ ] Returns 401 Unauthorized
+- [ ] Error message about not authenticated
 
-### 2. Invalid Token
+### 2. Invalid Bearer Token
 
 ```bash
 curl -H "Authorization: Bearer invalid_token" \
@@ -307,7 +359,19 @@ Expected:
 - [ ] Returns 401 Unauthorized
 - [ ] Error message about invalid token
 
-### 3. Invalid Request Data
+### 3. Invalid/Expired Session Cookie
+
+```bash
+curl -b "prepverse_session=invalid_cookie_value" \
+  http://localhost:8000/api/v1/auth/me
+```
+
+Expected:
+- [ ] Returns 401 Unauthorized
+- [ ] Falls back to checking Bearer token (if present)
+- [ ] Returns error if neither auth method works
+
+### 4. Invalid Request Data
 
 ```bash
 curl -X POST \
@@ -321,7 +385,7 @@ Expected:
 - [ ] Returns 422 Unprocessable Entity
 - [ ] Validation error about minimum answers
 
-### 4. Invalid Class Level
+### 5. Invalid Class Level
 
 ```bash
 curl -X POST \
@@ -372,18 +436,30 @@ Expected:
 
 ## Integration Tests
 
-### Full Onboarding Flow
+### Full Onboarding Flow (Cookie Auth - Web)
 
-1. [ ] Get user profile (creates user if new)
-2. [ ] Check onboarding status (should be incomplete)
-3. [ ] Get onboarding questions (10 random)
-4. [ ] Submit answers
-5. [ ] Check onboarding status again (should be complete)
-6. [ ] Verify data in database
+1. [ ] Complete OAuth login flow
+2. [ ] Verify session cookie is set
+3. [ ] Get user profile with cookie (creates user if new)
+4. [ ] Check onboarding status (should be incomplete)
+5. [ ] Get onboarding questions (10 random)
+6. [ ] Submit answers
+7. [ ] Check onboarding status again (should be complete)
+8. [ ] Verify data in database
+
+### Full Onboarding Flow (Bearer Auth - Mobile)
+
+1. [ ] Get Auth0 access token from mobile SDK or dashboard
+2. [ ] Get user profile with Bearer token (creates user if new)
+3. [ ] Check onboarding status (should be incomplete)
+4. [ ] Get onboarding questions (10 random)
+5. [ ] Submit answers
+6. [ ] Check onboarding status again (should be complete)
+7. [ ] Verify data in database
 
 ### Question Generation Flow
 
-1. [ ] Get user profile
+1. [ ] Authenticate with either method
 2. [ ] Generate questions for weak topics
 3. [ ] Verify questions are relevant
 4. [ ] Generate study plan
@@ -439,7 +515,7 @@ deactivate
 ### Common Issues
 
 1. **Module not found**
-   - Solution: Activate venv, reinstall dependencies
+   - Solution: Activate venv, reinstall dependencies with `uv sync`
 
 2. **Port already in use**
    - Solution: `lsof -ti:8000 | xargs kill -9`
@@ -447,10 +523,18 @@ deactivate
 3. **Database connection failed**
    - Solution: Check SUPABASE_URL and SUPABASE_KEY
 
-4. **Auth0 token invalid**
-   - Solution: Get fresh token, check AUTH0_DOMAIN and AUDIENCE
+4. **OAuth callback fails**
+   - Solution: Check AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, and AUTH0_DOMAIN
+   - Verify callback URL in Auth0 dashboard matches `http://localhost:8000/api/v1/auth/callback`
 
-5. **Gemini API error**
+5. **Session cookie not set**
+   - Solution: Check SESSION_SECRET_KEY is set
+   - Verify FRONTEND_URL matches where you're testing from
+
+6. **Bearer token invalid (mobile)**
+   - Solution: Get fresh token from Auth0 SDK, check AUTH0_DOMAIN and AUDIENCE
+
+7. **Gemini API error**
    - Solution: Verify GEMINI_API_KEY, check quota
 
 ## Test Results Template
