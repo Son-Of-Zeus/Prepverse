@@ -4,7 +4,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../api/client';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
-import { AlertCircle, CheckCircle2, Clock, ShieldAlert, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, ShieldAlert, X, LogOut } from 'lucide-react';
+
 import { FocusViolationModal } from '../components/focus/FocusViolationModal';
 
 import { StartSessionResponse, NextQuestionResponse, QuestionForSession, SubmitAnswerResponse, SessionResult } from '../types/practice';
@@ -107,7 +108,9 @@ export const PracticeSession = () => {
     const [violations, setViolations] = useState(0);
     const [showViolationModal, setShowViolationModal] = useState(false);
     const [showPreSessionWarning, setShowPreSessionWarning] = useState(true);
+    const [showQuitConfirm, setShowQuitConfirm] = useState(false);
     const maxViolations = 3;
+
     const interruptionStartRef = useRef<number | null>(null);
 
 
@@ -300,11 +303,18 @@ export const PracticeSession = () => {
     };
 
     const handleQuit = () => {
-        if (window.confirm("Are you sure you want to quit? Your progress will be saved but the session will end.")) {
-            // Save what we have so far
-            handleEndSession();
-        }
+        // Show custom modal instead of window.confirm
+        setShowQuitConfirm(true);
     };
+
+    const confirmQuit = () => {
+        handleEndSession();
+    };
+
+    const cancelQuit = () => {
+        setShowQuitConfirm(false);
+    };
+
 
     // Proctoring handlers
     const handleResumeFromViolation = () => {
@@ -495,6 +505,41 @@ export const PracticeSession = () => {
                     onEndSession={handleEndSessionFromViolation}
                 />
             )}
+
+            {/* Quit Confirmation Modal */}
+            {showQuitConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl relative animate-scale-in">
+                        <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                            <LogOut size={32} className="text-red-500" />
+                        </div>
+
+                        <h3 className="text-2xl font-display font-bold text-white text-center mb-2">
+                            End Session?
+                        </h3>
+
+                        <p className="text-slate-400 text-center mb-8 leading-relaxed">
+                            Are you sure you want to quit? Your progress will be saved but the session will end.
+                        </p>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={cancelQuit}
+                                className="flex-1 py-3 px-4 rounded-xl font-medium border border-white/10 text-slate-300 hover:bg-white/5 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmQuit}
+                                className="flex-1 py-3 px-4 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-900/20 transition-all transform hover:scale-[1.02]"
+                            >
+                                Quit Session
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             {/* Top Progress Bar */}
             <div className="fixed top-0 left-0 right-0 h-1 bg-slate-900 z-50">
