@@ -472,10 +472,14 @@ private fun DifficultySelector(
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
                     )
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 40.dp),
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = Surface,
                     selectedContainerColor = color.copy(alpha = 0.2f),

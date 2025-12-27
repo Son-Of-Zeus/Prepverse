@@ -2,9 +2,11 @@ package com.prepverse.prepverse.ui.screens.peer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -169,22 +171,34 @@ private fun SearchAndFilters(
             singleLine = true
         )
 
-        // Subject chips
+        // Subject chips - scrollable row
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val subjects = listOf("Mathematics", "Physics", "Chemistry", "Biology")
             FilterChip(
                 selected = selectedSubject == null,
                 onClick = { onSubjectChange(null) },
-                label = { Text("All") }
+                label = {
+                    Text(
+                        text = "All",
+                        maxLines = 1
+                    )
+                }
             )
             subjects.forEach { subject ->
                 FilterChip(
                     selected = selectedSubject == subject,
                     onClick = { onSubjectChange(subject) },
-                    label = { Text(subject) }
+                    label = {
+                        Text(
+                            text = subject,
+                            maxLines = 1
+                        )
+                    }
                 )
             }
         }
