@@ -1,7 +1,9 @@
 package com.prepverse.prepverse.di
 
 import android.content.Context
+import com.prepverse.prepverse.data.local.EncryptionManager
 import com.prepverse.prepverse.data.local.TokenStorage
+import com.prepverse.prepverse.data.realtime.SupabaseRealtimeManager
 import com.prepverse.prepverse.data.remote.AuthManager
 import dagger.Module
 import dagger.Provides
@@ -29,5 +31,20 @@ object AppModule {
         tokenStorage: TokenStorage
     ): AuthManager {
         return AuthManager(context, tokenStorage)
+    }
+
+    @Provides
+    @Singleton
+    fun provideEncryptionManager(
+        @ApplicationContext context: Context,
+        tokenStorage: TokenStorage
+    ): EncryptionManager {
+        return EncryptionManager(context, tokenStorage)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSupabaseRealtimeManager(): SupabaseRealtimeManager {
+        return SupabaseRealtimeManager()
     }
 }

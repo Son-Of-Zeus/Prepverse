@@ -1,10 +1,9 @@
 """
 Onboarding service to handle question selection and evaluation
 """
-import json
 import random
-from typing import List, Dict, Any
-from pathlib import Path
+from typing import List, Dict, Any, Optional
+from supabase import Client
 from app.schemas.question import OnboardingQuestion
 from app.schemas.onboarding import (
     OnboardingAnswer,
@@ -15,26 +14,16 @@ from app.schemas.onboarding import (
 
 class OnboardingService:
     """
-    Service to manage onboarding assessment logic
+    Service to manage onboarding assessment logic.
+    Fetches questions from Supabase database.
     """
 
-    def __init__(self):
-        self.questions_data = self._load_questions()
-
-    def _load_questions(self) -> Dict[str, Any]:
-        """
-        Load onboarding questions from JSON file
-        """
-        curriculum_path = Path(__file__).parent.parent / "curriculum" / "onboarding_questions.json"
-
-        with open(curriculum_path, 'r') as f:
-            data = json.load(f)
-
-        return data
+    def __init__(self, db: Optional[Client] = None):
+        self.db = db
 
     def get_random_questions(self, class_level: int, count: int = 10) -> List[OnboardingQuestion]:
         """
-        Get random questions for the specified class level
+        Get random questions for the specified class level from the database.
 
         Args:
             class_level: CBSE class (10 or 12)
@@ -43,22 +32,48 @@ class OnboardingService:
         Returns:
             List of random OnboardingQuestion objects
         """
-        all_questions = self.questions_data["questions"]
+        if self.db is None:
+            raise RuntimeError("Database client not initialized")
 
-        # Filter questions by class level
-        class_questions = [
-            q for q in all_questions
-            if q.get("class") == class_level
-        ]
+        # Query onboarding questions from the database
+        result = (
+            self.db.table("questions")
+            .select("*")
+            .eq("source", "onboarding")
+            .eq("class_level", class_level)
+            .execute()
+        )
+
+        class_questions = result.data
 
         if len(class_questions) < count:
-            raise ValueError(f"Not enough questions for class {class_level}")
+            raise ValueError(f"Not enough questions for class {class_level}. Found {len(class_questions)}, need {count}")
 
         # Randomly select questions
         selected = random.sample(class_questions, count)
 
-        # Convert to OnboardingQuestion objects
-        return [OnboardingQuestion(**q) for q in selected]
+        # Convert database rows to OnboardingQuestion objects
+        return [self._db_row_to_question(q) for q in selected]
+
+    def _db_row_to_question(self, row: Dict[str, Any]) -> OnboardingQuestion:
+        """
+        Convert a database row to an OnboardingQuestion object.
+        """
+        return OnboardingQuestion(
+            id=row["external_id"],
+            class_level=row["class_level"],
+            subject=row["subject"],
+            topic=row["topic"],
+            subtopic=row.get("subtopic", ""),
+            difficulty=row["difficulty"],
+            question_type=row.get("question_type", "mcq"),
+            question=row["question"],
+            options=row["options"],
+            correct_answer=row["correct_answer"],
+            explanation=row.get("explanation", ""),
+            time_estimate_seconds=row.get("time_estimate_seconds", 60),
+            concept_tags=row.get("concept_tags", [])
+        )
 
     def evaluate_answers(
         self,
@@ -174,5 +189,6 @@ class OnboardingService:
         return " ".join(recommendations)
 
 
-# Singleton instance
-onboarding_service = OnboardingService()
+def get_onboarding_service(db: Client) -> OnboardingService:
+    """Factory function for onboarding service"""
+    return OnboardingService(db)

@@ -1,9 +1,21 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    kotlin("plugin.serialization") version "1.9.20"
+}
+
+// Load Supabase config from local.properties
+val localProperties = Properties().apply {
+    val propsFile = rootProject.file("app/local.properties")
+    if (propsFile.exists()) {
+        load(FileInputStream(propsFile))
+    }
 }
 
 android {
@@ -20,14 +32,36 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Build flavors for different device types
+    flavorDimensions += "device"
+    productFlavors {
+        create("emulator") {
+            dimension = "device"
+            // 10.0.2.2 maps to host localhost from Android emulator
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
+        }
+        create("physical") {
+            dimension = "device"
+            // Your computer's local IP for physical device testing
+            buildConfigField("String", "API_BASE_URL", "\"http://172.31.98.79:8000\"")
+        }
+    }
+
     buildTypes {
         debug {
-            // Development: Android emulator or Android Device localhost
-            buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:8000\"")
+            // Supabase credentials from local.properties
+            buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("supabase.url", "")}\"")
+            buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("supabase.anon.key", "")}\"")
         }
         release {
             // Production: Replace with your deployed backend URL
-            buildConfigField("String", "API_BASE_URL", "\"https://api.prepverse.app\"")
+            // Note: For release builds, you may want a production API URL
+            // Override in each flavor if needed
+
+            // Supabase credentials from local.properties
+            buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("supabase.url", "")}\"")
+            buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("supabase.anon.key", "")}\"")
+
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -106,4 +140,12 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+
+    // Supabase Realtime
+    implementation("io.github.jan-tennert.supabase:realtime-kt:2.0.4")
+    implementation("io.ktor:ktor-client-okhttp:2.3.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+
+    // WebRTC for voice calls
+    implementation("io.getstream:stream-webrtc-android:1.1.1")
 }

@@ -234,5 +234,101 @@ interface PrepVerseApi {
     // Peer Endpoints
     // ================================
 
-    // TODO: Add peer session endpoints when backend implements them
+    // ================================
+    // Peer Endpoints
+    // ================================
+
+    // Encryption Keys
+    @POST("api/v1/peer/keys/register")
+    suspend fun registerEncryptionKeys(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.RegisterKeysRequest
+    ): Response<Unit>
+
+    @GET("api/v1/peer/keys/{userId}")
+    suspend fun getUserKeys(
+        @Path("userId") userId: String
+    ): Response<com.prepverse.prepverse.data.remote.api.dto.KeyBundleResponse>
+
+    // Sessions
+    @POST("api/v1/peer/sessions")
+    suspend fun createPeerSession(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.CreateSessionRequest
+    ): Response<com.prepverse.prepverse.data.remote.api.dto.SessionResponse>
+
+    @GET("api/v1/peer/sessions")
+    suspend fun listPeerSessions(
+        @Query("topic") topic: String? = null,
+        @Query("subject") subject: String? = null
+    ): Response<List<com.prepverse.prepverse.data.remote.api.dto.SessionResponse>>
+
+    @POST("api/v1/peer/sessions/{sessionId}/join")
+    suspend fun joinPeerSession(
+        @Path("sessionId") sessionId: String
+    ): Response<Unit>
+
+    @POST("api/v1/peer/sessions/{sessionId}/leave")
+    suspend fun leavePeerSession(
+        @Path("sessionId") sessionId: String
+    ): Response<Unit>
+
+    @GET("api/v1/peer/sessions/{sessionId}/participants")
+    suspend fun getSessionParticipants(
+        @Path("sessionId") sessionId: String
+    ): Response<List<com.prepverse.prepverse.data.remote.api.dto.ParticipantResponse>>
+
+    // Messaging
+    @POST("api/v1/peer/messages")
+    suspend fun sendPeerMessage(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.SendMessageRequest
+    ): Response<Unit>
+
+    @GET("api/v1/peer/messages/{sessionId}")
+    suspend fun getPeerMessages(
+        @Path("sessionId") sessionId: String,
+        @Query("since") since: String? = null
+    ): Response<List<com.prepverse.prepverse.data.remote.api.dto.MessageResponse>>
+
+    // Availability
+    @POST("api/v1/peer/availability")
+    suspend fun setAvailability(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.SetAvailabilityRequest
+    ): Response<Unit>
+
+    @GET("api/v1/peer/available")
+    suspend fun getAvailablePeers(): Response<List<com.prepverse.prepverse.data.remote.api.dto.AvailablePeerResponse>>
+
+    @POST("api/v1/peer/find-by-topic")
+    suspend fun findPeersByTopic(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.FindByTopicRequest
+    ): Response<List<com.prepverse.prepverse.data.remote.api.dto.AvailablePeerResponse>>
+
+    // Block & Report
+    @POST("api/v1/peer/block")
+    suspend fun blockUser(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.BlockUserRequest
+    ): Response<Unit>
+
+    @retrofit2.http.DELETE("api/v1/peer/block/{userId}")
+    suspend fun unblockUser(
+        @Path("userId") userId: String
+    ): Response<Unit>
+
+    @GET("api/v1/peer/blocked")
+    suspend fun getBlockedUsers(): Response<List<String>>
+
+    @POST("api/v1/peer/report")
+    suspend fun reportUser(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.ReportUserRequest
+    ): Response<Unit>
+
+    // Whiteboard
+    @POST("api/v1/peer/whiteboard/sync")
+    suspend fun syncWhiteboard(
+        @Body request: com.prepverse.prepverse.data.remote.api.dto.WhiteboardSyncRequest
+    ): Response<Unit>
+
+    @GET("api/v1/peer/whiteboard/{sessionId}")
+    suspend fun getWhiteboardState(
+        @Path("sessionId") sessionId: String
+    ): Response<com.prepverse.prepverse.data.remote.api.dto.WhiteboardStateResponse>
 }
