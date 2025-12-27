@@ -1,0 +1,178 @@
+PrepVerse Backend - Complete File Structure
+=============================================
+
+backend/
+│
+├── Documentation Files
+│   ├── README.md                    - Main project documentation
+│   ├── QUICKSTART.md                - Step-by-step setup guide
+│   ├── API_EXAMPLES.md              - Complete API examples with curl commands
+│   ├── DEPLOYMENT.md                - Production deployment guide
+│   ├── PROJECT_SUMMARY.md           - Project overview and architecture
+│   └── FILE_STRUCTURE.txt           - This file
+│
+├── Configuration Files
+│   ├── requirements.txt             - Python dependencies
+│   ├── .env.example                 - Environment variables template
+│   ├── .gitignore                   - Git ignore rules
+│   ├── run.sh                       - Development server run script
+│   └── database_schema.sql          - Supabase database schema
+│
+└── app/                             - Main application directory
+    │
+    ├── __init__.py                  - Package initialization
+    ├── main.py                      - FastAPI app entry point, CORS, routes
+    ├── config.py                    - Settings from environment variables
+    │
+    ├── api/                         - API endpoints
+    │   ├── __init__.py
+    │   └── v1/                      - API version 1
+    │       ├── __init__.py
+    │       ├── router.py            - Main API router (aggregates all routes)
+    │       ├── auth.py              - Authentication endpoints (/auth/me)
+    │       ├── onboarding.py        - Onboarding assessment endpoints
+    │       └── questions.py         - AI question generation endpoints
+    │
+    ├── core/                        - Core functionality
+    │   ├── __init__.py
+    │   ├── security.py              - Auth0 JWT validation logic
+    │   └── gemini.py                - Google Gemini AI client
+    │
+    ├── db/                          - Database
+    │   ├── __init__.py
+    │   └── session.py               - Supabase client setup
+    │
+    ├── schemas/                     - Pydantic schemas (data validation)
+    │   ├── __init__.py
+    │   ├── user.py                  - User-related schemas
+    │   ├── question.py              - Question-related schemas
+    │   └── onboarding.py            - Onboarding-related schemas
+    │
+    ├── services/                    - Business logic services
+    │   ├── __init__.py
+    │   └── onboarding_service.py    - Onboarding logic (question selection)
+    │
+    ├── models/                      - Database models (if needed for ORM)
+    │   └── __init__.py
+    │
+    └── curriculum/                  - Question banks
+        └── onboarding_questions.json - 100 pre-loaded CBSE questions
+
+
+TOTAL FILES CREATED: 30+
+
+Key Files Breakdown:
+===================
+
+1. ENTRY POINT
+   - app/main.py                     - FastAPI app with CORS and routes
+
+2. CONFIGURATION
+   - app/config.py                   - Centralized settings management
+   - .env.example                    - Template for environment variables
+
+3. API ENDPOINTS (8 endpoints)
+   - app/api/v1/auth.py              - 1 endpoint (GET /auth/me)
+   - app/api/v1/onboarding.py        - 3 endpoints (questions, submit, status)
+   - app/api/v1/questions.py         - 2 endpoints (generate, study-plan)
+   - app/api/v1/router.py            - Route aggregation
+
+4. CORE LOGIC
+   - app/core/security.py            - JWT validation with Auth0
+   - app/core/gemini.py              - AI question generation
+
+5. DATA LAYER
+   - app/db/session.py               - Supabase client
+   - database_schema.sql             - Database tables and RLS
+
+6. DATA VALIDATION (12 schemas)
+   - app/schemas/user.py             - 5 schemas (User, UserProfile, etc.)
+   - app/schemas/question.py         - 6 schemas (Question types)
+   - app/schemas/onboarding.py       - 5 schemas (Onboarding flow)
+
+7. BUSINESS LOGIC
+   - app/services/onboarding_service.py - Question selection & evaluation
+
+8. DATA
+   - app/curriculum/onboarding_questions.json - 100 CBSE questions
+
+9. DOCUMENTATION
+   - README.md                       - Main docs
+   - QUICKSTART.md                   - Setup guide
+   - API_EXAMPLES.md                 - API usage examples
+   - DEPLOYMENT.md                   - Deployment guide
+   - PROJECT_SUMMARY.md              - Architecture overview
+
+10. UTILITIES
+    - run.sh                         - Quick start script
+    - requirements.txt               - Dependencies
+    - .gitignore                     - Git exclusions
+
+
+Dependencies (10 packages):
+===========================
+1. fastapi==0.109.0                  - Web framework
+2. uvicorn[standard]==0.27.0         - ASGI server
+3. pydantic==2.5.3                   - Data validation
+4. pydantic-settings==2.1.0          - Settings management
+5. python-jose[cryptography]==3.3.0  - JWT handling
+6. python-multipart==0.0.6           - Form data
+7. supabase==2.3.1                   - Database client
+8. google-generativeai==0.3.2        - Gemini AI
+9. requests==2.31.0                  - HTTP client
+10. python-dotenv==1.0.0             - Environment vars
+
+
+Database Tables (4 tables):
+===========================
+1. users                             - User profiles
+2. onboarding_results                - Assessment results
+3. user_attempts                     - Question attempts tracking
+4. study_sessions                    - Study session data
+
+
+API Endpoints Summary:
+=====================
+
+PUBLIC:
+  GET  /                             - Root endpoint
+  GET  /health                       - Health check
+  GET  /docs                         - Swagger UI
+  GET  /redoc                        - ReDoc
+
+AUTHENTICATED:
+  GET  /api/v1/auth/me               - Current user profile
+  GET  /api/v1/onboarding/questions  - Get 10 random questions
+  POST /api/v1/onboarding/submit     - Submit answers & evaluate
+  GET  /api/v1/onboarding/status     - Onboarding completion status
+  POST /api/v1/questions/generate    - Generate questions with AI
+  POST /api/v1/questions/generate/study-plan - Generate study plan
+
+
+Environment Variables Required:
+===============================
+✓ SUPABASE_URL                       - Supabase project URL
+✓ SUPABASE_KEY                       - Supabase anon/service key
+✓ AUTH0_DOMAIN                       - Auth0 tenant domain
+✓ AUTH0_AUDIENCE                     - Auth0 API identifier
+✓ GEMINI_API_KEY                     - Google Gemini API key
+○ GEMINI_MODEL                       - Model name (default: gemini-1.5-flash)
+○ DEBUG                              - Debug mode (default: False)
+
+
+Quick Start:
+===========
+1. cd backend
+2. python3 -m venv venv
+3. source venv/bin/activate
+4. pip install -r requirements.txt
+5. cp .env.example .env
+6. Edit .env with your credentials
+7. Run database_schema.sql in Supabase
+8. chmod +x run.sh && ./run.sh
+9. Visit http://localhost:8000/docs
+
+
+Status: ✓ Production-ready MVP
+Version: 1.0.0
+Created: 2025-12-24
