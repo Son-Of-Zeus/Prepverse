@@ -74,7 +74,7 @@ class GenerateQuestionsRequest(BaseModel):
     topic: str
     difficulty: str = "medium"
     class_level: int
-    count: int = Field(default=5, ge=1, le=20)
+    count: int = Field(default=5, ge=1, le=50)
 
 
 class GenerateQuestionsResponse(BaseModel):
