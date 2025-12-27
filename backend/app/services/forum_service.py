@@ -55,7 +55,7 @@ class ForumService:
 
         # Build the query with user join for author name
         query = self.db.table("forum_posts").select(
-            "*, users!inner(name)"
+            "*, users!inner(full_name)"
         )
 
         # Apply filters
@@ -93,7 +93,7 @@ class ForumService:
         # Transform to response models
         posts = []
         for row in result.data:
-            author_name = row.get("users", {}).get("name", "Anonymous") if row.get("users") else "Anonymous"
+            author_name = row.get("users", {}).get("full_name", "Anonymous") if row.get("users") else "Anonymous"
             posts.append(
                 PostResponse(
                     id=str(row["id"]),
@@ -171,8 +171,8 @@ class ForumService:
         post = result.data[0]
 
         # Get author name
-        user_result = self.db.table("users").select("name").eq("id", user_id).execute()
-        author_name = user_result.data[0]["name"] if user_result.data else "Anonymous"
+        user_result = self.db.table("users").select("full_name").eq("id", user_id).execute()
+        author_name = user_result.data[0]["full_name"] if user_result.data else "Anonymous"
 
         return PostResponse(
             id=str(post["id"]),
@@ -207,7 +207,7 @@ class ForumService:
         """
         # Fetch post with author
         result = self.db.table("forum_posts").select(
-            "*, users!inner(name)"
+            "*, users!inner(full_name)"
         ).eq("id", post_id).execute()
 
         if not result.data:
@@ -222,12 +222,12 @@ class ForumService:
 
         # Fetch comments with authors
         comments_result = self.db.table("forum_comments").select(
-            "*, users!inner(name)"
+            "*, users!inner(full_name)"
         ).eq("post_id", post_id).order("created_at", desc=False).execute()
 
         comments = []
         for row in comments_result.data:
-            author_name = row.get("users", {}).get("name", "Anonymous") if row.get("users") else "Anonymous"
+            author_name = row.get("users", {}).get("full_name", "Anonymous") if row.get("users") else "Anonymous"
             comments.append(
                 CommentResponse(
                     id=str(row["id"]),
@@ -251,7 +251,7 @@ class ForumService:
             if vote_result.data:
                 user_vote_status = vote_result.data[0]["vote_type"]
 
-        author_name = post.get("users", {}).get("name", "Anonymous") if post.get("users") else "Anonymous"
+        author_name = post.get("users", {}).get("full_name", "Anonymous") if post.get("users") else "Anonymous"
         
         return PostDetailResponse(
             id=str(post["id"]),
@@ -335,8 +335,8 @@ class ForumService:
         comment = result.data[0]
 
         # Get author name
-        user_result = self.db.table("users").select("name").eq("id", user_id).execute()
-        author_name = user_result.data[0]["name"] if user_result.data else "Anonymous"
+        user_result = self.db.table("users").select("full_name").eq("id", user_id).execute()
+        author_name = user_result.data[0]["full_name"] if user_result.data else "Anonymous"
 
         return CommentResponse(
             id=str(comment["id"]),
