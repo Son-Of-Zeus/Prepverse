@@ -31,9 +31,9 @@ async def login(request: Request, platform: str = "web"):
     # Determine callback URL based on platform and environment
     if settings.DEBUG:
         if platform == "android":
-            # Android emulator: use direct backend URL (10.0.2.2 = host's localhost)
+            # Android emulator: use direct backend URL (127.0.0.1 = host's localhost)
             # This URL must be registered in Auth0 allowed callbacks
-            redirect_uri = "http://10.0.2.2:8000/api/v1/auth/callback"
+            redirect_uri = "http://127.0.0.1:8000/api/v1/auth/callback"
         else:
             # Web: requests come through Vite proxy, use frontend URL
             redirect_uri = f"{settings.FRONTEND_URL}/api/v1/auth/callback"
