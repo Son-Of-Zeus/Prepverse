@@ -13,3 +13,5 @@ api_router.include_router(onboarding.router)
 api_router.include_router(questions.router)
 api_router.include_router(practice.router)
 api_router.include_router(schools.router)
+from app.api.v1 import peer
+api_router.include_router(peer.router)

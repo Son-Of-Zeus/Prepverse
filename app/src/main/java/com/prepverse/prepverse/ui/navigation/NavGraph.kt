@@ -176,7 +176,21 @@ fun PrepVerseNavGraph(
         }
 
         composable(Routes.PeerLobby.route) {
-            // PeerLobbyScreen() - TODO
+            com.prepverse.prepverse.ui.screens.peer.PeerLobbyScreen(
+                onNavigateToSession = { sessionId ->
+                    navController.navigate(Routes.StudyRoom.createRoute(sessionId))
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.StudyRoom.route,
+            arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+        ) {
+            com.prepverse.prepverse.ui.screens.peer.StudyRoomScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }

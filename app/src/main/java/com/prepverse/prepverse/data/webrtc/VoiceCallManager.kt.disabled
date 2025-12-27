@@ -1,0 +1,129 @@
+package com.prepverse.prepverse.data.webrtc
+
+import org.webrtc.*
+import kotlinx.coroutines.suspendCancellableCoroutine
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.coroutines.resume
+
+/**
+ * Manages WebRTC voice calls in study rooms.
+ */
+@Singleton
+class VoiceCallManager @Inject constructor() {
+
+    private var peerConnection: PeerConnection? = null
+    private var localAudioTrack: AudioTrack? = null
+
+    private val iceServers = listOf(
+        PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
+    )
+
+    fun initializePeerConnection(
+        context: android.content.Context,
+        onIceCandidate: (IceCandidate) -> Unit,
+        onRemoteStream: (MediaStream) -> Unit
+    ) {
+        val options = PeerConnectionFactory.InitializationOptions.builder(context)
+            .createInitializationOptions()
+        PeerConnectionFactory.initialize(options)
+
+        val factory = PeerConnectionFactory.builder().createPeerConnectionFactory()
+
+        val rtcConfig = PeerConnection.RTCConfiguration(iceServers)
+
+        peerConnection = factory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
+            override fun onIceCandidate(candidate: IceCandidate) {
+                onIceCandidate(candidate)
+            }
+
+            override fun onAddStream(stream: MediaStream) {
+                onRemoteStream(stream)
+            }
+
+            override fun onSignalingChange(state: PeerConnection.SignalingState) {}
+            override fun onIceConnectionChange(state: PeerConnection.IceConnectionState) {}
+            override fun onIceConnectionReceivingChange(receiving: Boolean) {}
+            override fun onIceGatheringChange(state: PeerConnection.IceGatheringState) {}
+            override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
+            override fun onRemoveStream(stream: MediaStream) {}
+            override fun onDataChannel(channel: DataChannel) {}
+            override fun onRenegotiationNeeded() {}
+        })
+
+        // Create local audio track
+        val audioSource = factory.createAudioSource(MediaConstraints())
+        localAudioTrack = factory.createAudioTrack("audio", audioSource)
+
+        val stream = factory.createLocalMediaStream("localStream")
+        stream.addTrack(localAudioTrack)
+        peerConnection?.addStream(stream)
+    }
+
+    suspend fun createOffer(): SessionDescription? {
+        val constraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+        }
+
+        return suspendCancellableCoroutine { continuation ->
+            peerConnection?.createOffer(object : SdpObserver {
+                override fun onCreateSuccess(sdp: SessionDescription) {
+                    peerConnection?.setLocalDescription(SimpleSdpObserver(), sdp)
+                    continuation.resume(sdp)
+                }
+                override fun onCreateFailure(error: String) {
+                    continuation.resume(null)
+                }
+                override fun onSetSuccess() {}
+                override fun onSetFailure(error: String) {}
+            }, constraints)
+        }
+    }
+
+    suspend fun handleOffer(offer: SessionDescription): SessionDescription? {
+        peerConnection?.setRemoteDescription(SimpleSdpObserver(), offer)
+
+        val constraints = MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+        }
+
+        return suspendCancellableCoroutine { continuation ->
+            peerConnection?.createAnswer(object : SdpObserver {
+                override fun onCreateSuccess(sdp: SessionDescription) {
+                    peerConnection?.setLocalDescription(SimpleSdpObserver(), sdp)
+                    continuation.resume(sdp)
+                }
+                override fun onCreateFailure(error: String) {
+                    continuation.resume(null)
+                }
+                override fun onSetSuccess() {}
+                override fun onSetFailure(error: String) {}
+            }, constraints)
+        }
+    }
+
+    fun handleAnswer(answer: SessionDescription) {
+        peerConnection?.setRemoteDescription(SimpleSdpObserver(), answer)
+    }
+
+    fun addIceCandidate(candidate: IceCandidate) {
+        peerConnection?.addIceCandidate(candidate)
+    }
+
+    fun setMuted(muted: Boolean) {
+        localAudioTrack?.setEnabled(!muted)
+    }
+
+    fun disconnect() {
+        localAudioTrack?.setEnabled(false)
+        peerConnection?.close()
+        peerConnection = null
+    }
+
+    private class SimpleSdpObserver : SdpObserver {
+        override fun onCreateSuccess(sdp: SessionDescription) {}
+        override fun onSetSuccess() {}
+        override fun onCreateFailure(error: String) {}
+        override fun onSetFailure(error: String) {}
+    }
+}
