@@ -53,6 +53,7 @@ export function usePeerChat() {
         if (realtimeChannel) {
           broadcastMessage(realtimeChannel, {
             id: messageId,
+            sessionId: currentSession.id, // Required for Android to filter messages
             senderId: currentUserId,
             senderName: currentUserName,
             encryptedContent: encodedContent, // Base64 encoded for Android compatibility
