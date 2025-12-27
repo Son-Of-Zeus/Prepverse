@@ -1,13 +1,15 @@
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
-import { useDashboard, SuggestedTopic } from '../hooks/useDashboard';
+import { useDashboard, SuggestedTopic, fetchConceptMastery, fetchPerformanceTrend, ConceptMastery, RecentScore } from '../hooks/useDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { getRecentPractice, SubjectProgress } from '../utils/progress';
-import { useState, useEffect } from 'react';
+import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
+import { PerformanceTrend } from '../components/dashboard/PerformanceTrend';
 import {
   LayoutDashboard, Target, Zap, Swords,
   LogOut, Flame, Star, BookOpen, Clock,
-  ArrowRight, Trophy, Activity
+  ArrowRight, Trophy, Activity, TrendingUp
 } from 'lucide-react';
 
 // --- Components ---
@@ -15,14 +17,13 @@ import {
 const SideNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth(); // Get user for profile display
+  const { user } = useAuth();
 
   const navItems = [
-
     { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Start Practice', icon: Target, path: '/practice' },
-    { label: 'Focus Mode', icon: Zap, path: '/focus', disabled: true }, // Placeholder
-    { label: 'Start Battle', icon: Swords, path: '/battle', disabled: true }, // Placeholder
+    { label: 'Focus Mode', icon: Zap, path: '/focus' },
+    { label: 'Start Battle', icon: Swords, path: '/battle', disabled: true },
   ];
 
   return (
@@ -43,13 +44,13 @@ const SideNav = () => {
               onClick={() => !item.disabled && navigate(item.path)}
               disabled={item.disabled}
               className={`
-                                w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200
-                                ${isActive
+                w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200
+                ${isActive
                   ? 'bg-prepverse-red text-white shadow-glow-sm'
                   : 'text-slate-400 hover:bg-white/5 hover:text-white'
                 }
-                                ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}
-                            `}
+                ${item.disabled ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
             >
               <item.icon size={20} />
               <span>{item.label}</span>
@@ -60,7 +61,6 @@ const SideNav = () => {
       </nav>
 
       <div className="p-4 border-t border-white/5 space-y-4">
-        {/* User Profile Summary */}
         <div className="flex items-center gap-3 px-2">
           <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-prepverse-red font-bold border border-white/10">
             {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'S'}
@@ -70,10 +70,8 @@ const SideNav = () => {
             <p className="text-xs text-slate-500 truncate">Class {user?.class_level || 10}</p>
           </div>
         </div>
-
         <SignOutButton />
       </div>
-
     </aside>
   );
 };
@@ -95,12 +93,8 @@ const PracticeInsightsWidget = () => {
   const [recent, setRecent] = useState<SubjectProgress[]>([]);
   const navigate = useNavigate();
 
-
   useEffect(() => {
-    // Sync immediately on mount
     setRecent(getRecentPractice());
-
-    // Listener for storage updates (handling multi-tab sync if needed, but mainly re-mount checks)
     const handleStorageChange = () => setRecent(getRecentPractice());
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
@@ -134,7 +128,6 @@ const PracticeInsightsWidget = () => {
                 <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
                   {item.averageAccuracy}% Mastery
                 </span>
-                {/* Quick Play Mini Button */}
                 <button
                   onClick={() => {
                     navigate('/practice/session/quick-start', {
@@ -149,7 +142,6 @@ const PracticeInsightsWidget = () => {
                       }
                     });
                   }}
-
                   className="w-6 h-6 rounded-full bg-slate-800 hover:bg-prepverse-red flex items-center justify-center text-slate-400 hover:text-white transition-colors"
                   title="Quick Start"
                 >
@@ -158,7 +150,6 @@ const PracticeInsightsWidget = () => {
               </div>
             </div>
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-
               <div
                 className="h-full bg-gradient-brand rounded-full transition-all duration-1000 ease-out"
                 style={{ width: `${item.averageAccuracy}%` }}
@@ -189,6 +180,38 @@ export const DashboardPage: React.FC = () => {
     subjectScores,
     refresh,
   } = useDashboard();
+
+  // State for SWOT analysis and performance trend
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [concepts, setConcepts] = useState<ConceptMastery[]>([]);
+  const [performanceData, setPerformanceData] = useState<RecentScore[]>([]);
+  const [isLoadingConcepts, setIsLoadingConcepts] = useState(false);
+  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+
+  // Get available subjects from subjectScores
+  const availableSubjects = useMemo(() => Object.keys(subjectScores), [subjectScores]);
+
+  // Fetch concepts when subject changes
+  useEffect(() => {
+    if (selectedSubject) {
+      setIsLoadingConcepts(true);
+      fetchConceptMastery(selectedSubject).then((data) => {
+        setConcepts(data);
+        setIsLoadingConcepts(false);
+      });
+    } else if (availableSubjects.length > 0 && !selectedSubject) {
+      setSelectedSubject(availableSubjects[0] || '');
+    }
+  }, [selectedSubject, availableSubjects]);
+
+  // Fetch performance trend data
+  useEffect(() => {
+    setIsLoadingPerformance(true);
+    fetchPerformanceTrend().then((data) => {
+      setPerformanceData(data);
+      setIsLoadingPerformance(false);
+    });
+  }, []);
 
   if (isLoading) {
     return (
@@ -227,7 +250,6 @@ export const DashboardPage: React.FC = () => {
               <h2 className="text-3xl font-display text-white">
                 {getTimeGreeting()}, {user?.full_name || 'Student'}
               </h2>
-
               <p className="text-slate-400 mt-1">Ready to continue your journey?</p>
             </div>
             <div className="flex items-center gap-4">
@@ -260,8 +282,6 @@ export const DashboardPage: React.FC = () => {
                       const recent = getRecentPractice();
                       if (recent.length > 0 && recent[0]) {
                         const last = recent[0];
-
-                        // Assuming subjectId works as topic ID or mapped correctly
                         navigate('/practice/session/quick-start', {
                           state: {
                             config: { difficulty: 'medium', questionCount: 10, timer: '15 Mins' },
@@ -277,7 +297,6 @@ export const DashboardPage: React.FC = () => {
                         navigate('/practice');
                       }
                     }}
-
                     className="bg-gradient-to-br from-prepverse-red to-pink-600 rounded-2xl p-5 text-left group relative overflow-hidden shadow-lg shadow-prepverse-red/20 hover:scale-[1.02] transition-transform duration-300"
                   >
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -318,7 +337,7 @@ export const DashboardPage: React.FC = () => {
               )}
             </div>
 
-            {/* Column 2: Inputs & Study Time (1 col wide) */}
+            {/* Column 2: Insights & Study Time (1 col wide) */}
             <div className="space-y-6">
               <PracticeInsightsWidget />
 
@@ -330,6 +349,57 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-slate-500 text-sm">Time Spent Studying</p>
               </div>
             </div>
+          </div>
+
+          {/* SWOT Analysis Section */}
+          {availableSubjects.length > 0 && (
+            <div className="glass rounded-3xl p-6 border border-white/5">
+              <h3 className="font-display text-xl text-white mb-4 flex items-center gap-2">
+                <Zap className="text-violet-400" size={20} />
+                Subject Insights (SWOT)
+              </h3>
+              <div className="mb-4">
+                <label htmlFor="subject-select" className="block text-slate-400 text-sm mb-2 font-medium">
+                  Select Subject
+                </label>
+                <select
+                  id="subject-select"
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  className="w-full md:w-64 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                >
+                  {availableSubjects.map((subject) => (
+                    <option key={subject} value={subject} className="bg-slate-900 text-white">
+                      {formatSubjectName(subject)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {isLoadingConcepts ? (
+                <div className="p-12 text-center">
+                  <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-slate-400">Analyzing your performance...</p>
+                </div>
+              ) : (
+                <SWOTAnalysis concepts={concepts} streak={currentStreak} />
+              )}
+            </div>
+          )}
+
+          {/* Performance Trend Section */}
+          <div className="glass rounded-3xl p-6 border border-white/5">
+            <h3 className="font-display text-xl text-white mb-4 flex items-center gap-2">
+              <TrendingUp className="text-cyan-400" size={20} />
+              Performance Trajectory
+            </h3>
+            {isLoadingPerformance ? (
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-slate-400">Calculating trajectory...</p>
+              </div>
+            ) : (
+              <PerformanceTrend data={performanceData} />
+            )}
           </div>
 
           {/* Suggested Topics */}
@@ -456,4 +526,4 @@ function formatStudyTime(minutes: number): string {
   return mins > 0 ? `${hours}h ${mins}m` : `${hours} hours`;
 }
 
-
+export default DashboardPage;
