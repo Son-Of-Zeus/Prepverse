@@ -1,9 +1,11 @@
 import React from 'react';
 import { PrepVerseLogo } from '../ui/PrepVerseLogo';
+import { AlertTriangle } from 'lucide-react';
 
 interface WelcomeScreenProps {
   userName: string;
   onContinue: () => void;
+  alertMessage?: string | null;
 }
 
 /**
@@ -17,6 +19,7 @@ interface WelcomeScreenProps {
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   userName,
   onContinue,
+  alertMessage,
 }) => {
   const features = [
     {
@@ -39,6 +42,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
       <div className="w-full max-w-2xl space-y-12">
+        {/* Alert Message */}
+        {alertMessage && (
+          <div className="w-full p-6 rounded-3xl glass border border-red-500/20 flex items-center gap-4 animate-slide-down shadow-lg shadow-red-900/10">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-500/20 to-orange-500/20 flex items-center justify-center border border-red-500/30 shrink-0">
+              <AlertTriangle className="text-red-500" size={24} />
+            </div>
+            <div>
+              <h3 className="text-white font-display font-semibold text-lg">Session Terminated</h3>
+              <p className="text-gray-400 text-sm">{alertMessage}</p>
+            </div>
+          </div>
+        )}
+
         {/* Logo */}
         <div
           className="flex justify-center opacity-0 animate-fade-in"
