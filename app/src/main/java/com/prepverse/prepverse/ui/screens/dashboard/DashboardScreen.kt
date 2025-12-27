@@ -3,6 +3,7 @@ package com.prepverse.prepverse.ui.screens.dashboard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,18 +16,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.prepverse.prepverse.domain.model.MasteryLevel
-import com.prepverse.prepverse.domain.model.Subject
 import com.prepverse.prepverse.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     onNavigateToPractice: () -> Unit,
+    onNavigateToPracticeWithTopic: (subject: String, topic: String) -> Unit,
     onNavigateToFocus: () -> Unit,
-    onNavigateToBattle: () -> Unit,
+    onNavigateToProgress: () -> Unit,
+    onNavigateToPeer: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -72,8 +74,8 @@ fun DashboardScreen(
         },
         containerColor = Void
     ) { paddingValues ->
-        when (uiState) {
-            is DashboardUiState.Loading -> {
+        when {
+            uiState.isLoading -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -83,165 +85,237 @@ fun DashboardScreen(
                     CircularProgressIndicator(color = ElectricCyan)
                 }
             }
-            is DashboardUiState.Error -> {
+            uiState.error != null -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingValues),
+                        .padding(paddingValues)
+                        .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudOff,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(48.dp)
+                        )
                         Text(
-                            text = uiState.message,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = TextSecondary
+                            text = "Couldn't load dashboard",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = uiState.error ?: "Unknown error",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center
                         )
                         Button(
                             onClick = { viewModel.refresh() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = PrepVerseRed
-                            )
+                            colors = ButtonDefaults.buttonColors(containerColor = ElectricCyan)
                         ) {
-                            Text("Retry")
+                            Text("Retry", color = Void)
                         }
                     }
                 }
             }
-            is DashboardUiState.Success -> {
-                DashboardContent(
-                    data = uiState.data,
-                    onNavigateToPractice = onNavigateToPractice,
-                    onNavigateToFocus = onNavigateToFocus,
-                    onNavigateToBattle = onNavigateToBattle,
-                    modifier = Modifier.padding(paddingValues)
-                )
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Streak Card with real data
+                    item {
+                        StreakCard(
+                            currentStreak = uiState.currentStreak,
+                            totalXP = uiState.totalXP
+                        )
+                    }
+
+                    // Quick Actions
+                    item {
+                        Text(
+                            text = "Quick Actions",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            QuickActionCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Practice",
+                                icon = Icons.Default.Quiz,
+                                color = MathColor,
+                                onClick = onNavigateToPractice
+                            )
+                            QuickActionCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Focus",
+                                icon = Icons.Default.Timer,
+                                color = PrepVerseRed,
+                                onClick = onNavigateToFocus
+                            )
+                        }
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            QuickActionCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Progress",
+                                icon = Icons.Default.TrendingUp,
+                                color = NeonGreen,
+                                onClick = onNavigateToProgress
+                            )
+                            QuickActionCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Study Room",
+                                icon = Icons.Default.Groups,
+                                color = PlasmaPurple,
+                                onClick = onNavigateToPeer
+                            )
+                        }
+                    }
+
+                    // Continue Learning - Recently practiced topics
+                    if (uiState.continueLearning.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Continue Learning",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        items(uiState.continueLearning) { topic ->
+                            SuggestedTopicCard(
+                                subject = topic.subject,
+                                topicId = topic.topic,
+                                topicName = topic.displayName,
+                                progress = topic.progress,
+                                color = getSubjectColor(topic.subject),
+                                onClick = { onNavigateToPracticeWithTopic(topic.subject, topic.topic) }
+                            )
+                        }
+                    }
+
+                    // Suggested Topics - Topics user is weak on
+                    if (uiState.suggestedTopics.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Suggested Topics",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Topics you need more practice on",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+
+                        items(uiState.suggestedTopics) { topic ->
+                            SuggestedTopicCard(
+                                subject = topic.subject,
+                                topicId = topic.topic,
+                                topicName = topic.displayName,
+                                progress = topic.progress,
+                                color = getSubjectColor(topic.subject),
+                                onClick = { onNavigateToPracticeWithTopic(topic.subject, topic.topic) }
+                            )
+                        }
+                    }
+
+                    // Show empty state for new users (no recent topics and no suggested)
+                    if (uiState.continueLearning.isEmpty() && uiState.suggestedTopics.isEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Get Started",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Surface),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.School,
+                                        contentDescription = null,
+                                        tint = ElectricCyan,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Text(
+                                        text = "Start your first practice session!",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = TextPrimary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        text = "Complete practice sessions to track your progress and get personalized recommendations.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextSecondary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
             }
         }
     }
 }
 
-@Composable
-private fun DashboardContent(
-    data: com.prepverse.prepverse.domain.model.DashboardData,
-    onNavigateToPractice: () -> Unit,
-    onNavigateToFocus: () -> Unit,
-    onNavigateToBattle: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Streak and Daily XP Card
-        item {
-            StreakAndXPCard(
-                currentStreak = data.streakInfo.currentStreak,
-                totalXP = data.streakInfo.totalXP,
-                dailyXP = data.dailyXP
-            )
-        }
-
-        // Performance Summary
-        item {
-            Text(
-                text = "Performance Summary",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        item {
-            PerformanceSummaryCard(
-                overallAccuracy = data.performanceSummary.overallAccuracy,
-                totalQuestions = data.performanceSummary.totalQuestions,
-                correctAnswers = data.performanceSummary.correctAnswers,
-                recentScores = data.performanceSummary.recentScores
-            )
-        }
-
-        // Quick Actions
-        item {
-            Text(
-                text = "Quick Actions",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                QuickActionCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Start Practice",
-                    icon = Icons.Default.Quiz,
-                    color = MathColor,
-                    onClick = onNavigateToPractice
-                )
-                QuickActionCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Focus Mode",
-                    icon = Icons.Default.Timer,
-                    color = PrepVerseRed,
-                    onClick = onNavigateToFocus
-                )
-            }
-        }
-
-        item {
-            QuickActionCard(
-                modifier = Modifier.fillMaxWidth(),
-                title = "Join Battle",
-                icon = Icons.Default.SportsEsports,
-                color = PlasmaPurple,
-                onClick = onNavigateToBattle
-            )
-        }
-
-        // Suggested Topics
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Suggested Topics",
-                style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        items(data.suggestedTopics.size) { index ->
-            val topic = data.suggestedTopics[index]
-            SuggestedTopicCard(
-                subject = topic.subject,
-                topic = topic.topic,
-                progress = topic.progress,
-                accuracy = topic.accuracy,
-                masteryLevel = topic.masteryLevel,
-                color = getSubjectColor(topic.subject)
-            )
-        }
-
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+private fun getSubjectColor(subject: String): Color {
+    return when (subject.lowercase()) {
+        "mathematics", "math" -> MathColor
+        "physics" -> PhysicsColor
+        "chemistry" -> ChemistryColor
+        "biology" -> BiologyColor
+        else -> ElectricCyan
     }
 }
 
 @Composable
-private fun StreakAndXPCard(
-    currentStreak: Int,
-    totalXP: Int,
-    dailyXP: Int
-) {
+private fun StreakCard(currentStreak: Int, totalXP: Int) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Surface),
@@ -258,15 +332,15 @@ private fun StreakAndXPCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .background(SolarGold.copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
+                        .size(48.dp)
+                        .background(SolarGold.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.LocalFireDepartment,
                         contentDescription = null,
                         tint = SolarGold,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
@@ -275,7 +349,7 @@ private fun StreakAndXPCard(
                 Column {
                     Text(
                         text = "$currentStreak Day Streak",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold
                     )
@@ -287,183 +361,20 @@ private fun StreakAndXPCard(
                 }
             }
 
-            // XP badges
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "+$dailyXP",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = ElectricCyan,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Today",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "$totalXP",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = ElectricCyan,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Total XP",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PerformanceSummaryCard(
-    overallAccuracy: Float,
-    totalQuestions: Int,
-    correctAnswers: Int,
-    recentScores: List<com.prepverse.prepverse.domain.model.RecentScore>
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        shape = RoundedCornerShape(20.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Overall stats
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                StatItem(
-                    label = "Accuracy",
-                    value = "${overallAccuracy.toInt()}%",
-                    color = ElectricCyan
+            // XP badge
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "$totalXP",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = ElectricCyan,
+                    fontWeight = FontWeight.Bold
                 )
-                StatItem(
-                    label = "Questions",
-                    value = "$totalQuestions",
-                    color = NeonGreen
-                )
-                StatItem(
-                    label = "Correct",
-                    value = "$correctAnswers",
-                    color = Success
+                Text(
+                    text = "Total XP",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
                 )
             }
-
-            Divider(color = SurfaceVariant, thickness = 1.dp)
-
-            // Recent scores
-            if (recentScores.isNotEmpty()) {
-                Text(
-                    text = "Recent Scores",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    recentScores.take(5).forEach { score ->
-                        RecentScoreItem(score = score)
-                    }
-                }
-            } else {
-                Text(
-                    text = "No recent scores yet. Start practicing!",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatItem(
-    label: String,
-    value: String,
-    color: Color
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            color = color,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
-        )
-    }
-}
-
-@Composable
-private fun RecentScoreItem(
-    score: com.prepverse.prepverse.domain.model.RecentScore
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            if (score.subject != null && score.topic != null) {
-                Text(
-                    text = "${score.subject} - ${score.topic}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Medium
-                )
-            } else {
-                Text(
-                    text = "Practice Session",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            Text(
-                text = score.date,
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-        }
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "${score.attempts} questions",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-            Text(
-                text = "${score.score.toInt()}%",
-                style = MaterialTheme.typography.titleMedium,
-                color = getScoreColor(score.score),
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }
@@ -517,14 +428,15 @@ private fun QuickActionCard(
 @Composable
 private fun SuggestedTopicCard(
     subject: String,
-    topic: String,
+    topicId: String,
+    topicName: String,
     progress: Float,
-    accuracy: Float,
-    masteryLevel: MasteryLevel,
-    color: Color
+    color: Color,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = Surface),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -552,27 +464,12 @@ private fun SuggestedTopicCard(
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = topic,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Badge(
-                        containerColor = getMasteryColor(masteryLevel).copy(alpha = 0.2f),
-                        contentColor = getMasteryColor(masteryLevel)
-                    ) {
-                        Text(
-                            text = masteryLevel.name.lowercase().replaceFirstChar { it.uppercase() },
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                }
+                Text(
+                    text = topicName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Medium
+                )
                 Text(
                     text = subject,
                     style = MaterialTheme.typography.bodySmall,
@@ -591,55 +488,25 @@ private fun SuggestedTopicCard(
                     trackColor = SurfaceVariant,
                     strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
                 )
+            }
 
-                Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.width(16.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "${(progress * 100).toInt()}% Complete",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = "${accuracy.toInt()}% Accuracy",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
+            // Progress percentage and arrow icon
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "${(progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Go to practice",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun getSubjectColor(subject: String): Color {
-    return when (Subject.fromString(subject)) {
-        Subject.MATHEMATICS -> MathColor
-        Subject.PHYSICS -> PhysicsColor
-        Subject.CHEMISTRY -> ChemistryColor
-        Subject.BIOLOGY -> BiologyColor
-        null -> TextSecondary
-    }
-}
-
-@Composable
-private fun getScoreColor(score: Float): Color {
-    return when {
-        score >= 80 -> Success
-        score >= 60 -> Warning
-        else -> Error
-    }
-}
-
-@Composable
-private fun getMasteryColor(masteryLevel: MasteryLevel): Color {
-    return when (masteryLevel) {
-        MasteryLevel.BEGINNER -> TextSecondary
-        MasteryLevel.LEARNING -> Info
-        MasteryLevel.PROFICIENT -> Warning
-        MasteryLevel.MASTERED -> Success
     }
 }

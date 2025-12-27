@@ -187,6 +187,7 @@ API docs available at `http://localhost:8000/docs` when backend is running.
 - Use Pydantic models for request/response schemas
 - Follow existing patterns in `backend/app/schemas/` and `backend/app/services/`
 - Async functions for route handlers
+- **CRITICAL**: Use `get_db_user_id(current_user, db)` from `app.core.security` for database user ID - never use `current_user.get("db_id")` or `current_user.get("id")` directly (breaks legacy JWT auth)
 
 **Web (React/TypeScript):**
 - Functional components only, no class components

@@ -1,23 +1,39 @@
 """
-Google Gemini Flash 3 client for question generation
+Google Gemini Flash client for question generation
+Uses the new google-genai SDK (replaces deprecated google-generativeai)
 """
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from typing import List, Dict, Any
+from pydantic import BaseModel
 from app.config import get_settings
 
 settings = get_settings()
 
-# Configure Gemini API
-genai.configure(api_key=settings.GEMINI_API_KEY)
+# Create Gemini client
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+
+class GeneratedQuestion(BaseModel):
+    """Schema for a generated question"""
+    question: str
+    options: List[str]
+    correct_answer: str
+    explanation: str
+    difficulty: str
+    subject: str
+    topic: str
 
 
 class GeminiClient:
     """
     Client for interacting with Google Gemini API
+    Uses the new google-genai SDK with async support
     """
 
     def __init__(self):
-        self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        self.model = settings.GEMINI_MODEL
+        self.client = client
 
     async def generate_questions(
         self,
@@ -47,45 +63,56 @@ Topic: {topic}
 Difficulty: {difficulty}
 
 Requirements:
-1. Each question should have 4 options
-2. Include the correct answer
+1. Each question should have exactly 4 options
+2. Include the correct answer (must match one of the options exactly)
 3. Provide a brief explanation
 4. Make questions relevant to CBSE curriculum
 5. Ensure questions test conceptual understanding
 
-Return the response in the following JSON format:
-[
-  {{
-    "question": "Question text here?",
-    "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-    "correct_answer": "The correct option text",
-    "explanation": "Brief explanation of why this is correct",
-    "difficulty": "{difficulty}",
-    "subject": "{subject}",
-    "topic": "{topic}"
-  }}
-]
+Generate exactly {count} questions."""
 
-Generate {count} questions following this exact format."""
+        # Define the JSON schema for structured output
+        questions_schema = {
+            'type': 'ARRAY',
+            'items': {
+                'type': 'OBJECT',
+                'properties': {
+                    'question': {'type': 'STRING'},
+                    'options': {
+                        'type': 'ARRAY',
+                        'items': {'type': 'STRING'}
+                    },
+                    'correct_answer': {'type': 'STRING'},
+                    'explanation': {'type': 'STRING'},
+                    'difficulty': {'type': 'STRING'},
+                    'subject': {'type': 'STRING'},
+                    'topic': {'type': 'STRING'}
+                },
+                'required': ['question', 'options', 'correct_answer', 'explanation', 'difficulty', 'subject', 'topic']
+            }
+        }
 
         try:
-            response = self.model.generate_content(prompt)
+            response = await self.client.aio.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                    response_schema=questions_schema
+                )
+            )
 
-            # Extract and parse JSON from response
+            # Parse the JSON response
             import json
-            import re
+            questions_data = json.loads(response.text)
 
-            # Try to extract JSON from the response
-            text = response.text
+            # Ensure subject, topic, and difficulty are set correctly
+            for q in questions_data:
+                q['subject'] = subject
+                q['topic'] = topic
+                q['difficulty'] = difficulty
 
-            # Find JSON array in the response
-            json_match = re.search(r'\[[\s\S]*\]', text)
-            if json_match:
-                questions_data = json.loads(json_match.group())
-                return questions_data
-            else:
-                # If no JSON found, return empty list
-                return []
+            return questions_data
 
         except Exception as e:
             print(f"Error generating questions with Gemini: {str(e)}")
@@ -125,14 +152,59 @@ Create a day-by-day study plan that:
 4. Allocates time realistically (2-4 hours per day)
 5. Includes breaks and revision cycles
 
-Return the response in JSON format with daily breakdown."""
+Return a structured study plan."""
+
+        # Define schema for study plan
+        study_plan_schema = {
+            'type': 'OBJECT',
+            'properties': {
+                'overview': {'type': 'STRING'},
+                'total_days': {'type': 'INTEGER'},
+                'daily_hours': {'type': 'INTEGER'},
+                'daily_plan': {
+                    'type': 'ARRAY',
+                    'items': {
+                        'type': 'OBJECT',
+                        'properties': {
+                            'day': {'type': 'INTEGER'},
+                            'topics': {
+                                'type': 'ARRAY',
+                                'items': {'type': 'STRING'}
+                            },
+                            'activities': {
+                                'type': 'ARRAY',
+                                'items': {'type': 'STRING'}
+                            },
+                            'practice_questions': {'type': 'INTEGER'},
+                            'notes': {'type': 'STRING'}
+                        },
+                        'required': ['day', 'topics', 'activities']
+                    }
+                },
+                'tips': {
+                    'type': 'ARRAY',
+                    'items': {'type': 'STRING'}
+                }
+            },
+            'required': ['overview', 'daily_plan']
+        }
 
         try:
-            response = self.model.generate_content(prompt)
-            return {"plan": response.text}
+            response = await self.client.aio.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                    response_schema=study_plan_schema
+                )
+            )
+
+            import json
+            return json.loads(response.text)
+
         except Exception as e:
             print(f"Error generating study plan: {str(e)}")
-            return {"plan": "Unable to generate study plan. Please try again."}
+            return {"plan": "Unable to generate study plan. Please try again.", "error": str(e)}
 
 
 # Singleton instance

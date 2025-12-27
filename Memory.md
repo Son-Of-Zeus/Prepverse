@@ -530,6 +530,7 @@ cd web && npm run dev
 | `onboarding/OnboardingScreen.kt` | 4-step onboarding flow (Welcome, Class Selection, Assessment, Results) |
 | `onboarding/OnboardingViewModel.kt` | Onboarding state and logic |
 | `dashboard/DashboardScreen.kt` | Main dashboard with streak, actions, topics |
+| `dashboard/DashboardViewModel.kt` | Fetches progress data from API (streak, XP, suggested topics) |
 
 ### Data Layer (`data/`)
 | File | Purpose |
@@ -824,6 +825,103 @@ cd web && npm run dev
     - Auto-navigates to Login after all permissions granted
     - Re-checks permissions when user returns from Settings
 
+### 2024-12-27 - Practice Mode Implementation
+- **Backend Practice APIs**: Full practice session management with adaptive difficulty
+  - New files:
+    - `backend/practice_schema.sql` - Database tables for questions, sessions, concept scores
+    - `backend/app/schemas/practice.py` - Pydantic schemas for practice endpoints
+    - `backend/app/services/practice_service.py` - Practice service with concept-based adaptive difficulty
+    - `backend/app/api/v1/practice.py` - Practice API endpoints
+  - Updated `backend/app/api/v1/router.py` - Added practice router
+
+  - **Database Tables Added**:
+    - `questions` - Cached questions from Gemini (reusable)
+    - `practice_sessions` - Session metadata and results
+    - `practice_session_questions` - Questions assigned to sessions with answers
+    - `concept_scores` - Per-topic mastery tracking for adaptive difficulty
+    - `curriculum_topics` - Available topics for practice (pre-seeded)
+
+  - **API Endpoints** (`/api/v1/practice`):
+    - `GET /topics` - Get available curriculum topics
+    - `POST /session/start` - Start a practice session
+    - `GET /session/{id}/next` - Get next question
+    - `POST /session/{id}/submit` - Submit answer with feedback
+    - `POST /session/{id}/end` - End session, get summary
+    - `GET /session/{id}/review` - Get full session review
+    - `GET /history` - Paginated session history
+    - `GET /progress/concepts` - Concept mastery scores
+    - `GET /progress/summary` - Overall progress summary
+
+  - **Adaptive Difficulty Algorithm**:
+    - Tracks per-concept mastery score (0-100)
+    - Adjusts question difficulty based on accuracy
+    - <40% mastery → mostly easy questions
+    - 40-70% mastery → mix of easy/medium
+    - >70% mastery → more hard questions
+
+- **Android Practice Mode**: Complete UI implementation
+  - New files:
+    - `data/remote/api/dto/PracticeDtos.kt` - Practice DTOs
+    - `data/repository/PracticeRepository.kt` - Practice API calls
+    - `ui/screens/practice/PracticeViewModel.kt` - Topic selection state
+    - `ui/screens/practice/PracticeScreen.kt` - Topic selector UI
+    - `ui/screens/practice/QuizViewModel.kt` - Quiz session state with timer
+    - `ui/screens/practice/QuizScreen.kt` - Quiz UI with answer feedback
+    - `ui/screens/practice/ResultsViewModel.kt` - Results state
+    - `ui/screens/practice/ResultsScreen.kt` - Score summary and question review
+
+  - Updated files:
+    - `data/remote/api/PrepVerseApi.kt` - Added 10 practice endpoints
+    - `ui/navigation/Routes.kt` - Added Quiz and Results routes with sessionId
+    - `ui/navigation/NavGraph.kt` - Wired Practice → Quiz → Results navigation
+
+  - **Features**:
+    - Subject/topic selection with filtering
+    - Difficulty selection (Easy/Medium/Hard/Adaptive)
+    - Configurable question count (5-30)
+    - Optional time limit (5/10/15/20 min)
+    - Per-question timer tracking
+    - Answer submission with instant feedback
+    - Explanation shown after each answer
+    - Session summary with score breakdown
+    - Full question review with correct answers
+    - Difficulty breakdown in results
+    - Weak/strong topic identification
+
 ---
 
-*Last Updated: 2024-12-26*
+## Important Patterns & Gotchas
+
+### Backend User ID Resolution
+
+**CRITICAL**: When accessing the database user ID in API endpoints, ALWAYS use `get_db_user_id()`:
+
+```python
+from app.core.security import get_current_user_flexible, get_db_user_id
+
+@router.get("/example")
+async def example_endpoint(
+    current_user: dict = Depends(get_current_user_flexible),
+    db=Depends(get_db),
+):
+    user_id = await get_db_user_id(current_user, db)  # ✅ CORRECT
+```
+
+**DO NOT** use these patterns (they break for legacy JWT auth):
+```python
+# ❌ WRONG - 'id' key doesn't exist
+user_id = current_user.get("db_id") or current_user.get("id")
+
+# ❌ WRONG - returns Auth0 ID, not database UUID
+user_id = current_user.get("user_id")
+```
+
+**Why this matters**: The `current_user` dict has different fields depending on auth method:
+- Session auth (cookie/bearer_session): Has `db_id` (database UUID)
+- Legacy JWT auth (bearer_jwt): Only has `user_id` (Auth0 ID like `google-oauth2|...`)
+
+The `get_db_user_id()` function in `backend/app/core/security.py` handles both cases by looking up the database UUID from Auth0 ID when needed.
+
+---
+
+*Last Updated: 2024-12-27*

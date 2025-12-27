@@ -187,21 +187,39 @@ async def get_current_user_profile(
 
         user_data = result.data[0]
 
-        # Get user stats
-        stats_result = (
+        # Get user stats from both user_attempts (onboarding) and practice_session_questions
+        # 1. Onboarding attempts from user_attempts
+        onboarding_stats = (
             db.table("user_attempts")
             .select("id, is_correct")
             .eq("user_id", user_data["id"])
             .execute()
         )
-
-        total_attempts = len(stats_result.data) if stats_result.data else 0
-        correct_attempts = (
-            sum(1 for attempt in stats_result.data if attempt.get("is_correct", False))
-            if stats_result.data
+        onboarding_total = len(onboarding_stats.data) if onboarding_stats.data else 0
+        onboarding_correct = (
+            sum(1 for a in onboarding_stats.data if a.get("is_correct", False))
+            if onboarding_stats.data
             else 0
         )
 
+        # 2. Practice attempts from practice_session_questions (via practice_sessions)
+        practice_stats = (
+            db.table("practice_session_questions")
+            .select("id, is_correct, practice_sessions!inner(user_id)")
+            .eq("practice_sessions.user_id", user_data["id"])
+            .not_.is_("user_answer", "null")  # Only count answered questions
+            .execute()
+        )
+        practice_total = len(practice_stats.data) if practice_stats.data else 0
+        practice_correct = (
+            sum(1 for a in practice_stats.data if a.get("is_correct", False))
+            if practice_stats.data
+            else 0
+        )
+
+        # Combine stats
+        total_attempts = onboarding_total + practice_total
+        correct_attempts = onboarding_correct + practice_correct
         accuracy = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0.0
 
         return UserProfile(

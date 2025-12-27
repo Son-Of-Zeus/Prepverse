@@ -7,8 +7,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.prepverse.prepverse.ui.screens.auth.LoginScreen
 import com.prepverse.prepverse.ui.screens.auth.LoginViewModel
 import com.prepverse.prepverse.ui.screens.dashboard.DashboardScreen
@@ -16,6 +18,9 @@ import com.prepverse.prepverse.ui.screens.focus.FocusModeScreen
 import com.prepverse.prepverse.ui.screens.onboarding.OnboardingScreen
 import com.prepverse.prepverse.ui.screens.onboarding.OnboardingViewModel
 import com.prepverse.prepverse.ui.screens.permission.PermissionScreen
+import com.prepverse.prepverse.ui.screens.practice.PracticeScreen
+import com.prepverse.prepverse.ui.screens.practice.QuizScreen
+import com.prepverse.prepverse.ui.screens.practice.ResultsScreen
 
 @Composable
 fun PrepVerseNavGraph(
@@ -83,15 +88,76 @@ fun PrepVerseNavGraph(
 
         composable(Routes.Dashboard.route) {
             DashboardScreen(
-                onNavigateToPractice = { navController.navigate(Routes.Practice.route) },
+                onNavigateToPractice = { navController.navigate(Routes.Practice.createRoute()) },
+                onNavigateToPracticeWithTopic = { subject, topic ->
+                    navController.navigate(Routes.Practice.createRoute(subject, topic))
+                },
                 onNavigateToFocus = { navController.navigate(Routes.FocusMode.route) },
-                onNavigateToBattle = { navController.navigate(Routes.PeerLobby.route) }
+                onNavigateToProgress = { navController.navigate(Routes.Progress.route) },
+                onNavigateToPeer = { navController.navigate(Routes.PeerLobby.route) }
             )
         }
 
-        // Placeholder routes - to be implemented
-        composable(Routes.Practice.route) {
-            // PracticeScreen()
+        // Practice Mode screens
+        composable(
+            route = Routes.Practice.route,
+            arguments = listOf(
+                navArgument("subject") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("topic") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val initialSubject = backStackEntry.arguments?.getString("subject")
+            val initialTopic = backStackEntry.arguments?.getString("topic")
+
+            PracticeScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToQuiz = { sessionId ->
+                    navController.navigate(Routes.Quiz.createRoute(sessionId))
+                },
+                initialSubject = initialSubject,
+                initialTopic = initialTopic
+            )
+        }
+
+        composable(
+            route = Routes.Quiz.route,
+            arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+        ) {
+            QuizScreen(
+                onNavigateToResults = { sessionId ->
+                    navController.navigate(Routes.Results.createRoute(sessionId)) {
+                        // Pop quiz from back stack so user can't go back to it
+                        popUpTo(Routes.Practice.route)
+                    }
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.Results.route,
+            arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+        ) {
+            ResultsScreen(
+                onNavigateBack = {
+                    navController.navigate(Routes.Dashboard.route) {
+                        popUpTo(Routes.Dashboard.route) { inclusive = true }
+                    }
+                },
+                onNavigateToPractice = {
+                    navController.navigate(Routes.Practice.createRoute()) {
+                        popUpTo(Routes.Dashboard.route)
+                    }
+                }
+            )
         }
 
         composable(Routes.FocusMode.route) {
@@ -101,11 +167,11 @@ fun PrepVerseNavGraph(
         }
 
         composable(Routes.Progress.route) {
-            // ProgressScreen()
+            // ProgressScreen() - TODO
         }
 
         composable(Routes.PeerLobby.route) {
-            // PeerLobbyScreen()
+            // PeerLobbyScreen() - TODO
         }
     }
 }

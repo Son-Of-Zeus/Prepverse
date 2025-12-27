@@ -1,0 +1,405 @@
+
+ * ▗ ▗   ▖ ▖ *   Claude Code v2.0.76
+*             *  Opus 4.5 · Claude Max
+ *   ▘▘ ▝▝   *   ~/Desktop/Dev/PEC
+
+  A gift for you
+  Your rate limits are 2x higher through 12/31. Enjoy the extra room to think!
+
+> /Users/vpranav/Downloads/Copy\ of\ PEC\ Hacks\ 3.0\ PPT\ \ \(1\).pdf What 
+are the things to be implemented? 
+
+⏺ Read(~/Downloads/Copy of PEC Hacks 3.0 PPT  (1).pdf)
+  ⎿  Read PDF (1MB)
+
+⏺ Based on the PPT, here are the features to be implemented for PrepVerse:
+
+  Core Features
+
+  1. Dashboard
+
+  - Summary of recent performance
+  - Suggested topics based on weaknesses
+  - Visual trend analytics
+
+  2. Focus Mode (Pomodoro)
+
+  - Timed study sessions with optional gentle reminders
+  - Privacy-safe telemetry for focus tracking
+  - Session interruption tracking (for stress correlation)
+
+  3. Dynamic Question Generator
+
+  - AI-powered question generation using Gemini
+  - Topic-based practice quizzes
+  - Short concept checks
+  - Adaptive difficulty based on performance
+
+  4. Progress Tracking
+
+  - Concept-wise score breakdown
+  - Time-per-question metrics
+  - Prioritized revision paths for weak concepts
+  - Stress correlation analysis
+
+  5. Peer Mentoring & Collaboration
+
+  - Study rooms (scheduled or instant join)
+  - Quiz battles with matched peers
+  - Whiteboards during sessions
+  - Collaborative notes
+  - WebRTC for real-time video/audio
+
+  6. Community Resources
+
+  - Shared/curated notes
+  - Save personalized copies
+  - Remix and re-upload improved versions
+
+  7. Offline-First Experience
+
+  - PWA support (web)
+  - Mobile app (Android)
+  - Offline storage with sync
+  - Conflict resolution when reconnecting
+
+  Current Implementation Status (from codebase)
+
+  | Feature               | Status         |
+  |-----------------------|----------------|
+  | Auth (Google OAuth)   | Done           |
+  | Onboarding flow       | Done           |
+  | Focus Mode            | Done (Android) |
+  | Question generation   | Partial        |
+  | Progress dashboard    | API exists     |
+  | Peer sessions/battles | API scaffolded |
+  | Offline sync          | Scaffolded     |
+  | WebRTC                | Helpers exist  |
+
+  Still Needs Implementation
+
+  1. Mini exam/mock test with detailed review
+  2. Study battles (gamified peer competitions)
+  3. Whiteboard for peer sessions
+  4. Community notes system
+  5. Adaptive difficulty algorithm
+  6. Visual flowchart journey in UI
+  7. Full offline sync with conflict resolution
+  8. On-device analytics pipeline
+
+> ultrathink and create an implementation plan. Ask me if there are any 
+unresolved questions
+  ⎿  Interrupted · What should Claude do instead?
+
+> ultrathink and create an phase wise implementation plan. Ask me if there 
+are any unresolved questions
+
+⏺ Let me first explore the current codebase to understand what's already implemented, then create a comprehensive phase-wise plan.
+
+⏺ Explore(Explore codebase implementation status)
+  ⎿  Done (29 tool uses · 78.8k tokens · 1m 17s)                           
+
+⏺ Now I have a complete picture. Let me create a comprehensive phase-wise implementation plan.
+
+  ---
+  PrepVerse Implementation Plan
+
+  Current Status Summary
+
+  | Component                   | Done | Partial             | Missing     |
+  |-----------------------------|------|---------------------|-------------|
+  | Auth (all platforms)        | ✅   |                     |             |
+  | Onboarding (all platforms)  | ✅   |                     |             |
+  | Question Generation API     | ✅   |                     |             |
+  | Focus Mode (Android)        | ✅   |                     |             |
+  | Focus Mode (Web)            |      | ✅ Components exist | Integration |
+  | Dashboard                   |      | ✅ Scaffold         | Data/UI     |
+  | Practice Mode               |      |                     | ✅          |
+  | Progress Analytics          |      |                     | ✅          |
+  | Peer Collaboration          |      |                     | ✅          |
+  | Offline Sync                |      |                     | ✅          |
+  | Gamification                |      |                     | ✅          |
+  | Database (8 tables missing) |      | ✅                  |             |
+
+  ---
+  Phase 1: Core Learning Loop
+
+  Goal: Students can practice questions and see their progress
+
+  1.1 Database Schema Additions
+
+  - questions (store generated questions for reuse)
+  - question_attempts (track each answer)
+  - concept_scores (topic-wise mastery tracking)
+  - focus_sessions (pomodoro history)
+
+  1.2 Backend APIs
+
+  | Endpoint                      | Purpose                                    |
+  |-------------------------------|--------------------------------------------|
+  | POST /practice/session/start  | Start practice session (topic, difficulty) |
+  | POST /practice/session/submit | Submit answer, get next question           |
+  | POST /practice/session/end    | End session, calculate scores              |
+  | GET /progress/dashboard       | Overall stats, weak areas, streaks         |
+  | GET /progress/concepts        | Concept-wise breakdown                     |
+  | POST /focus/start             | Start focus session                        |
+  | POST /focus/end               | End focus session with stats               |
+  | GET /focus/history            | Past focus sessions                        |
+
+  1.3 Web Implementation
+
+  - Dashboard page with:
+    - Performance summary cards
+    - Suggested topics (based on weaknesses)
+    - Recent activity
+    - Start Practice CTA
+  - Practice page with:
+    - Topic/subject selector
+    - Question display with timer
+    - Answer submission
+    - Explanation after answer
+  - Progress page with:
+    - Concept mastery chart
+    - Time-per-question trends
+    - Weak area highlights
+
+  1.4 Android Implementation
+
+  - Dashboard screen (similar to web)
+  - Practice screen with question flow
+  - Progress screen with charts
+
+  ---
+  Phase 2: Focus Mode & Analytics
+
+  Goal: Complete focus mode on web, detailed analytics
+
+  2.1 Web Focus Mode
+
+  - Pomodoro timer with settings
+  - Break modal with countdown
+  - Focus statistics dashboard
+  - Session history
+
+  2.2 Enhanced Analytics
+
+  - Time-per-question metrics
+  - Session interruption tracking (stress proxy)
+  - Study patterns visualization
+  - Concept strength/weakness radar chart
+
+  2.3 Backend
+
+  - Focus session analytics aggregation
+  - Study pattern analysis service
+  - Adaptive difficulty algorithm (based on concept scores)
+
+  ---
+  Phase 3: Peer Collaboration
+
+  Goal: Students can study together and compete
+
+  3.1 Database Additions
+
+  - peer_sessions (study rooms)
+  - peer_session_participants
+  - peer_messages (chat)
+  - battle_sessions (quiz battles)
+  - battle_results
+
+  3.2 Backend APIs
+
+  | Endpoint                     | Purpose                 |
+  |------------------------------|-------------------------|
+  | POST /peer/rooms/create      | Create study room       |
+  | GET /peer/rooms              | List available rooms    |
+  | POST /peer/rooms/{id}/join   | Join a room             |
+  | POST /peer/battles/create    | Create quiz battle      |
+  | POST /peer/battles/{id}/join | Join battle             |
+  | WS /peer/realtime            | WebSocket for real-time |
+
+  3.3 Real-time Infrastructure
+
+  - Supabase Realtime for presence
+  - WebRTC signaling for video/audio
+  - Real-time quiz synchronization
+
+  3.4 Web Implementation
+
+  - Study room lobby
+  - Room UI with:
+    - Video/audio (WebRTC)
+    - Whiteboard (canvas-based)
+    - Collaborative notes
+    - Chat sidebar
+  - Battle mode UI:
+    - Matchmaking
+    - Real-time question sync
+    - Live score comparison
+    - Results screen
+
+  3.5 Android Implementation
+
+  - Study room screens
+  - Battle mode screens
+  - WebRTC integration
+
+  ---
+  Phase 4: Gamification & Engagement
+
+  Goal: Keep students motivated with rewards
+
+  4.1 Database Additions
+
+  - user_gamification (XP, level, streak)
+  - achievements (badge definitions)
+  - user_achievements (earned badges)
+  - daily_progress (streak tracking)
+
+  4.2 Backend
+
+  - XP calculation service
+  - Level progression system
+  - Achievement trigger system
+  - Streak tracking logic
+
+  4.3 Features
+
+  | Feature      | Description                                               |
+  |--------------|-----------------------------------------------------------|
+  | XP System    | Earn XP for completing sessions, battles, streaks         |
+  | Levels       | Progress through levels (Novice → Master)                 |
+  | Streaks      | Daily study streak with multipliers                       |
+  | Badges       | Achievement badges (First Battle Won, 7-Day Streak, etc.) |
+  | Leaderboards | Weekly/monthly rankings                                   |
+
+  4.4 UI (Both platforms)
+
+  - XP/level display in header
+  - Streak indicator
+  - Achievement notifications
+  - Leaderboard page
+  - Profile with badges
+
+  ---
+  Phase 5: Community & Content
+
+  Goal: Shared learning resources
+
+  5.1 Database Additions
+
+  - shared_notes (community notes)
+  - note_versions (edit history)
+  - note_ratings (upvotes)
+
+  5.2 Features
+
+  - Browse curated notes by topic
+  - Save personal copies
+  - Edit and re-upload improved versions
+  - Upvote/downvote system
+  - Moderation queue
+
+  ---
+  Phase 6: Offline-First & Sync
+
+  Goal: Work without internet
+
+  6.1 Web (PWA)
+
+  - Service Worker for caching
+  - IndexedDB (Dexie.js) for:
+    - Questions cache
+    - Attempt queue
+    - Notes cache
+  - Background sync when online
+  - Conflict resolution (last-write-wins or merge)
+
+  6.2 Android
+
+  - Room database for local storage
+  - WorkManager for background sync
+  - Sync queue for offline attempts
+  - Conflict resolution
+
+  6.3 Backend
+
+  - Sync endpoints with timestamps
+  - Conflict detection
+  - Batch submission support
+
+  ---
+  Phase 7: Mini Exams & Mock Tests
+
+  Goal: Full exam simulation
+
+  7.1 Features
+
+  - Timed mock tests (30/60/90 min)
+  - Question paper generation (CBSE pattern)
+  - Exam mode (no distractions)
+  - Detailed result analysis:
+    - Concept-wise breakdown
+    - Time analysis per question
+    - Comparison with average
+    - Improvement suggestions
+
+  ---
+  Dependency Graph
+
+  Phase 1 (Core) ─────────┬──────────────────────────────────────┐
+           │              │                                      │
+           ▼              ▼                                      ▼
+  Phase 2 (Focus)    Phase 4 (Gamification)              Phase 6 (Offline)
+           │              │
+           ▼              ▼
+  Phase 3 (Peer) ────► Phase 5 (Community)
+           │
+           ▼
+  Phase 7 (Mock Tests)
+
+  ---
+  Questions Before Finalizing
+
+  Priority & Scope
+
+  1. Platform Priority: Should I prioritize Web or Android? Or implement both in parallel for each phase?
+  2. MVP Scope: For the hackathon demo, which phases are must-have vs nice-to-have? I suggest:
+    - Must-have: Phase 1 (Practice + Progress) + Phase 2 (Focus on Web)
+    - Nice-to-have: Phase 3 (Peer), Phase 4 (Gamification)
+  3. Focus Mode Web: The components exist but aren't integrated into a full flow. Should this be a standalone page or embedded in Practice mode?
+
+  Technical Decisions
+
+  4. Offline Strategy:
+    - Option A: Simple queue-based (offline actions queued, sync when online)
+    - Option B: Full offline-first with conflict resolution
+    - Which approach for the hackathon?
+  5. Peer Collaboration Scope:
+    - Full video/audio via WebRTC?
+    - Or text chat + shared quiz only (simpler)?
+  6. Whiteboard:
+    - Build custom canvas-based whiteboard?
+    - Or integrate existing library (e.g., tldraw, excalidraw)?
+  7. Gamification Complexity:
+    - Simple (XP + streaks only)?
+    - Or full system (levels, badges, leaderboards)?
+
+  Data & AI
+
+  8. Question Storage: Should generated questions be cached in DB for reuse, or always generate fresh?
+  9. Adaptive Difficulty:
+    - Rule-based (if score < 60% → easier)?
+    - Or more sophisticated algorithm?
+  10. Study Plan Generation: The endpoint exists (/questions/generate/study-plan). Should this be surfaced in the dashboard as a personalized recommendation?
+
+  Design
+
+  11. Tech Stack Discrepancy: The PPT mentions Flutter for mobile, but the codebase uses Kotlin/Compose. Should I continue with Kotlin or is there a plan to switch?
+  12. Community Notes Moderation: Manual review? Or auto-publish with report system?
+
+  ---
+  Let me know your answers to these questions, and I'll refine the plan with specific implementation details for each phase.
+
+
+

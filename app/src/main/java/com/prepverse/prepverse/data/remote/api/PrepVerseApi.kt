@@ -1,17 +1,29 @@
 package com.prepverse.prepverse.data.remote.api
 
-import com.prepverse.prepverse.data.remote.api.dto.DashboardResponse
+import com.prepverse.prepverse.data.remote.api.dto.ConceptProgressResponse
+import com.prepverse.prepverse.data.remote.api.dto.EndSessionRequest
+import com.prepverse.prepverse.data.remote.api.dto.EndSessionResponse
 import com.prepverse.prepverse.data.remote.api.dto.GenerateQuestionsRequest
 import com.prepverse.prepverse.data.remote.api.dto.GenerateQuestionsResponse
+import com.prepverse.prepverse.data.remote.api.dto.NextQuestionResponse
 import com.prepverse.prepverse.data.remote.api.dto.OnboardingResponse
 import com.prepverse.prepverse.data.remote.api.dto.OnboardingStatusResponse
 import com.prepverse.prepverse.data.remote.api.dto.OnboardingSubmission
+import com.prepverse.prepverse.data.remote.api.dto.ProgressSummaryResponse
 import com.prepverse.prepverse.data.remote.api.dto.QuestionResponse
+import com.prepverse.prepverse.data.remote.api.dto.SessionHistoryResponse
+import com.prepverse.prepverse.data.remote.api.dto.StartSessionRequest
+import com.prepverse.prepverse.data.remote.api.dto.StartSessionResponse
+import com.prepverse.prepverse.data.remote.api.dto.SubmitAnswerRequest
+import com.prepverse.prepverse.data.remote.api.dto.SubmitAnswerResponse
+import com.prepverse.prepverse.data.remote.api.dto.TopicsResponse
 import com.prepverse.prepverse.data.remote.api.dto.UserProfileResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * PrepVerse Backend API Interface
@@ -40,7 +52,7 @@ interface PrepVerseApi {
      */
     @GET("api/v1/onboarding/questions")
     suspend fun getOnboardingQuestions(
-        @retrofit2.http.Query("class_level") classLevel: Int
+        @Query("class_level") classLevel: Int
     ): Response<List<QuestionResponse>>
 
     /**
@@ -70,14 +82,85 @@ interface PrepVerseApi {
     ): Response<GenerateQuestionsResponse>
 
     // ================================
-    // Dashboard Endpoints
+    // Practice Endpoints
     // ================================
 
     /**
-     * Get dashboard data including performance summary, suggested topics, streak, and XP
+     * Get available topics for practice
      */
-    @GET("api/v1/dashboard")
-    suspend fun getDashboard(): Response<DashboardResponse>
+    @GET("api/v1/practice/topics")
+    suspend fun getTopics(
+        @Query("subject") subject: String? = null
+    ): Response<TopicsResponse>
+
+    /**
+     * Start a new practice session
+     */
+    @POST("api/v1/practice/session/start")
+    suspend fun startPracticeSession(
+        @Body request: StartSessionRequest
+    ): Response<StartSessionResponse>
+
+    /**
+     * Get the next question in the session
+     */
+    @GET("api/v1/practice/session/{sessionId}/next")
+    suspend fun getNextQuestion(
+        @Path("sessionId") sessionId: String
+    ): Response<NextQuestionResponse>
+
+    /**
+     * Submit an answer for the current question
+     */
+    @POST("api/v1/practice/session/{sessionId}/submit")
+    suspend fun submitAnswer(
+        @Path("sessionId") sessionId: String,
+        @Body request: SubmitAnswerRequest
+    ): Response<SubmitAnswerResponse>
+
+    /**
+     * End a practice session
+     */
+    @POST("api/v1/practice/session/{sessionId}/end")
+    suspend fun endPracticeSession(
+        @Path("sessionId") sessionId: String,
+        @Body request: EndSessionRequest
+    ): Response<EndSessionResponse>
+
+    /**
+     * Get review for a completed session
+     */
+    @GET("api/v1/practice/session/{sessionId}/review")
+    suspend fun getSessionReview(
+        @Path("sessionId") sessionId: String
+    ): Response<EndSessionResponse>
+
+    /**
+     * Get session history
+     */
+    @GET("api/v1/practice/history")
+    suspend fun getSessionHistory(
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 10
+    ): Response<SessionHistoryResponse>
+
+    // ================================
+    // Progress Endpoints
+    // ================================
+
+    /**
+     * Get concept mastery scores
+     */
+    @GET("api/v1/practice/progress/concepts")
+    suspend fun getConceptProgress(
+        @Query("subject") subject: String? = null
+    ): Response<ConceptProgressResponse>
+
+    /**
+     * Get overall progress summary
+     */
+    @GET("api/v1/practice/progress/summary")
+    suspend fun getProgressSummary(): Response<ProgressSummaryResponse>
 
     // ================================
     // Focus Endpoints

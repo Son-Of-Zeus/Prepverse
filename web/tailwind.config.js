@@ -30,6 +30,7 @@ export default {
         physics: '#4ECDC4',
         chemistry: '#9B59B6',
         biology: '#27AE60',
+        science: '#3498DB', // Class 10 combined science (blue)
       },
       fontFamily: {
         sans: ['Space Grotesk', 'system-ui', 'sans-serif'],

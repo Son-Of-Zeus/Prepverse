@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { LoginPage, OnboardingPage, DashboardPage } from './pages';
 import { useAuth } from './hooks/useAuth';
 import './styles/globals.css';
