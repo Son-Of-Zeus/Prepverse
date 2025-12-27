@@ -20,12 +20,13 @@ class OnboardingRepository @Inject constructor(
     private val api: PrepVerseApi
 ) {
     /**
-     * Get 10 random onboarding questions based on user's class level
+     * Get 10 random onboarding questions based on class level
+     * @param classLevel The student's class (10 or 12)
      * @return Result containing list of questions or error
      */
-    suspend fun getOnboardingQuestions(): Result<List<QuestionResponse>> = withContext(Dispatchers.IO) {
+    suspend fun getOnboardingQuestions(classLevel: Int): Result<List<QuestionResponse>> = withContext(Dispatchers.IO) {
         try {
-            val response = api.getOnboardingQuestions()
+            val response = api.getOnboardingQuestions(classLevel)
 
             if (response.isSuccessful) {
                 response.body()?.let { questions ->

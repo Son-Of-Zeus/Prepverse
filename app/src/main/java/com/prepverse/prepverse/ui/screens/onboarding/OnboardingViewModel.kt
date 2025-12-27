@@ -71,8 +71,8 @@ class OnboardingViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            // Fetch questions from backend
-            onboardingRepository.getOnboardingQuestions()
+            // Fetch questions from backend with selected class level
+            onboardingRepository.getOnboardingQuestions(selectedClass)
                 .onSuccess { questions ->
                     Timber.d("Fetched ${questions.size} onboarding questions from backend")
                     apiQuestions = questions
