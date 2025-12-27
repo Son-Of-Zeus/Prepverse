@@ -324,17 +324,6 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Subject Progress */}
-              {Object.keys(subjectScores).length > 0 && (
-                <div className="glass rounded-3xl p-6 border border-white/5">
-                  <h3 className="font-display text-xl text-white mb-4">Subject Mastery</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {Object.entries(subjectScores).map(([subject, score]) => (
-                      <SubjectProgressCard key={subject} subject={subject} score={score} />
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Column 2: Insights & Study Time (1 col wide) */}
@@ -351,12 +340,28 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Recommended for You */}
+          {suggestedTopics.length > 0 && (
+            <div className="glass rounded-3xl p-6 border border-white/5">
+              <h3 className="font-display text-xl text-white mb-4">Recommended for You</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {suggestedTopics.map((topic) => (
+                  <TopicCard
+                    key={`${topic.subject}-${topic.topic}`}
+                    topic={topic}
+                    suggested
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* SWOT Analysis Section */}
           {availableSubjects.length > 0 && (
             <div className="glass rounded-3xl p-6 border border-white/5">
               <h3 className="font-display text-xl text-white mb-4 flex items-center gap-2">
                 <Zap className="text-violet-400" size={20} />
-                Subject Insights (SWOT)
+                SWOT Analysis
               </h3>
               {/* Subject Tabs */}
               <div className="flex flex-wrap gap-2 mb-6">
@@ -391,7 +396,7 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
 
-          {/* Performance Trend Section */}
+          {/* Performance Trajectory Section */}
           <div className="glass rounded-3xl p-6 border border-white/5">
             <h3 className="font-display text-xl text-white mb-4 flex items-center gap-2">
               <TrendingUp className="text-cyan-400" size={20} />
@@ -406,22 +411,6 @@ export const DashboardPage: React.FC = () => {
               <PerformanceTrend data={performanceData} />
             )}
           </div>
-
-          {/* Suggested Topics */}
-          {suggestedTopics.length > 0 && (
-            <div className="glass rounded-3xl p-6 border border-white/5">
-              <h3 className="font-display text-xl text-white mb-4">Recommended for You</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {suggestedTopics.map((topic) => (
-                  <TopicCard
-                    key={`${topic.subject}-${topic.topic}`}
-                    topic={topic}
-                    suggested
-                  />
-                ))}
-              </div>
-            </div>
-          )}
 
         </div>
       </main>
@@ -477,22 +466,6 @@ function getSubjectBorderColor(subject: string): string {
   };
   return colors[subject.toLowerCase()] || 'border-cosmic text-cosmic';
 }
-
-const SubjectProgressCard = ({ subject, score }: any) => {
-  const bgColor = getSubjectBgColor(subject);
-  const displayName = formatSubjectName(subject);
-  return (
-    <div className="bg-slate-900/50 rounded-xl p-4 border border-white/5">
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-slate-300 font-medium">{displayName}</span>
-        <span className="text-xs font-mono text-slate-500">{score.toFixed(0)}%</span>
-      </div>
-      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${bgColor}`} style={{ width: `${score}%` }} />
-      </div>
-    </div>
-  );
-};
 
 const TopicCard = ({ topic, suggested }: any) => {
   const borderColor = getSubjectBorderColor(topic.subject);

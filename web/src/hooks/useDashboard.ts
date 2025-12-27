@@ -82,22 +82,21 @@ export interface RecentScore {
 }
 
 /**
- * Calculate streak from total sessions (simplified)
+ * Dashboard response from /dashboard endpoint (for streak/XP)
  */
-function calculateStreak(totalSessions: number): number {
-  return Math.min(totalSessions, 30); // Cap at 30 for display
-}
-
-/**
- * Calculate XP from progress data
- * - Base: 10 XP per correct answer
- * - Bonus: 5 XP per session completed
- */
-function calculateXP(totalQuestions: number, accuracy: number, totalSessions: number): number {
-  const totalCorrect = Math.floor((totalQuestions * accuracy) / 100);
-  const baseXP = totalCorrect * 10;
-  const sessionBonus = totalSessions * 5;
-  return baseXP + sessionBonus;
+interface DashboardApiResponse {
+  performance_summary: {
+    recent_scores: RecentScore[];
+    overall_accuracy: number;
+    total_questions: number;
+    correct_answers: number;
+  };
+  streak_info: {
+    current_streak: number;
+    longest_streak: number;
+    total_xp: number;
+  };
+  daily_xp: number;
 }
 
 /**
@@ -142,24 +141,30 @@ export function useDashboard() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const response = await apiClient.get<ProgressSummary>('/practice/progress/summary');
-      const data = response.data;
+      // Fetch both endpoints in parallel for real data
+      const [progressResponse, dashboardResponse] = await Promise.all([
+        apiClient.get<ProgressSummary>('/practice/progress/summary'),
+        apiClient.get<DashboardApiResponse>('/dashboard').catch(() => null), // Don't fail if dashboard endpoint fails
+      ]);
+
+      const progressData = progressResponse.data;
+
+      // Get real streak and XP from dashboard endpoint, fallback to 0 if unavailable
+      const streakInfo = dashboardResponse?.data?.streak_info;
+      const currentStreak = streakInfo?.current_streak ?? 0;
+      const totalXP = streakInfo?.total_xp ?? 0;
 
       setState({
         isLoading: false,
         error: null,
-        currentStreak: calculateStreak(data.total_sessions),
-        totalXP: calculateXP(
-          data.total_questions_attempted,
-          data.overall_accuracy,
-          data.total_sessions
-        ),
-        continueLearning: mapTopics(data.continue_learning, data.subject_scores),
-        suggestedTopics: mapTopics(data.suggested_topics, data.subject_scores),
-        totalSessions: data.total_sessions,
-        overallAccuracy: data.overall_accuracy,
-        totalStudyTimeMinutes: data.total_study_time_minutes,
-        subjectScores: data.subject_scores,
+        currentStreak,
+        totalXP,
+        continueLearning: mapTopics(progressData.continue_learning, progressData.subject_scores),
+        suggestedTopics: mapTopics(progressData.suggested_topics, progressData.subject_scores),
+        totalSessions: progressData.total_sessions,
+        overallAccuracy: progressData.overall_accuracy,
+        totalStudyTimeMinutes: progressData.total_study_time_minutes,
+        subjectScores: progressData.subject_scores,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load dashboard';
