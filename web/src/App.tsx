@@ -1,5 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, BattlePage, PracticeSelectionPage } from './pages';
+
+import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, BattlePage, PracticeSelectionPage } from './pages';
+import { PracticeResults } from './pages/PracticeResults';
+import { DiscussionFeed } from './pages/DiscussionFeed';
+import { DiscussionThread } from './pages/DiscussionThread';
+import { FocusModePage } from './pages/FocusMode';
 import { useAuth } from './hooks/useAuth';
 import './styles/globals.css';
 import { FocusProvider, useFocus } from './contexts/FocusContext';
@@ -142,6 +147,24 @@ function AppContent() {
           element={
             isAuthenticated
               ? (user?.onboarding_completed ? <PracticeSelectionPage onNavigateBack={() => navigate('/dashboard')} /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Discussion Routes */}
+        <Route
+          path="/discussion"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <DiscussionFeed /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+        <Route
+          path="/discussion/:id"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <DiscussionThread /> : <Navigate to="/onboarding" />)
               : <Navigate to="/login" />
           }
         />
