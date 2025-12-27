@@ -2,15 +2,18 @@ package com.prepverse.prepverse.ui.screens.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.prepverse.prepverse.data.remote.api.dto.ProgressSummaryResponse
+import com.prepverse.prepverse.data.remote.api.dto.ConceptMastery
 import com.prepverse.prepverse.data.remote.api.dto.TopicInfo
+import com.prepverse.prepverse.data.repository.DashboardRepository
 import com.prepverse.prepverse.data.repository.PracticeRepository
 import com.prepverse.prepverse.data.repository.PracticeResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 data class DashboardUiState(
@@ -18,11 +21,18 @@ data class DashboardUiState(
     val error: String? = null,
     val currentStreak: Int = 0,
     val totalXP: Int = 0,
+    val longestStreak: Int = 0,
+    val dailyXP: Int = 0,
     val continueLearning: List<SuggestedTopic> = emptyList(),
     val suggestedTopics: List<SuggestedTopic> = emptyList(),
     val totalSessions: Int = 0,
     val overallAccuracy: Float = 0f,
-    val totalStudyTimeMinutes: Int = 0
+    val totalStudyTimeMinutes: Int = 0,
+    // SWOT Analysis data
+    val concepts: List<ConceptMastery> = emptyList(),
+    val selectedSubject: String? = null,
+    val availableSubjects: List<String> = listOf("Mathematics", "Physics", "Chemistry", "Biology"),
+    val isLoadingConcepts: Boolean = false
 )
 
 data class SuggestedTopic(
@@ -32,9 +42,24 @@ data class SuggestedTopic(
     val progress: Float // 0.0 to 1.0
 )
 
+// SWOT Analysis insight item
+data class SWOTInsight(
+    val label: String,
+    val description: String
+)
+
+// SWOT Analysis data
+data class SWOTAnalysisData(
+    val strengths: List<SWOTInsight>,
+    val weaknesses: List<SWOTInsight>,
+    val opportunities: List<SWOTInsight>,
+    val threats: List<SWOTInsight>
+)
+
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val practiceRepository: PracticeRepository
+    private val practiceRepository: PracticeRepository,
+    private val dashboardRepository: DashboardRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -48,14 +73,34 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            when (val result = practiceRepository.getProgressSummary()) {
+            // Fetch from both endpoints in parallel for real data
+            val progressDeferred = async { practiceRepository.getProgressSummary() }
+            val dashboardDeferred = async { dashboardRepository.getDashboard() }
+
+            val progressResult = progressDeferred.await()
+            val dashboardResult = dashboardDeferred.await()
+
+            // Get real streak/XP from dashboard endpoint (fallback to 0 if unavailable)
+            val streakInfo = dashboardResult.getOrNull()?.streakInfo
+            val currentStreak = streakInfo?.currentStreak ?: 0
+            val longestStreak = streakInfo?.longestStreak ?: 0
+            val totalXP = streakInfo?.totalXP ?: 0
+            val dailyXP = dashboardResult.getOrNull()?.dailyXP ?: 0
+
+            if (dashboardResult.isFailure) {
+                Timber.w("Failed to fetch dashboard data for streak/XP, using defaults")
+            }
+
+            when (progressResult) {
                 is PracticeResult.Success -> {
-                    val data = result.data
+                    val data = progressResult.data
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = null,
-                        currentStreak = calculateStreak(data),
-                        totalXP = calculateXP(data),
+                        currentStreak = currentStreak,
+                        totalXP = totalXP,
+                        longestStreak = longestStreak,
+                        dailyXP = dailyXP,
                         continueLearning = mapTopics(data.continueLearning, data.subjectScores),
                         suggestedTopics = mapTopics(data.suggestedTopics, data.subjectScores),
                         totalSessions = data.totalSessions,
@@ -66,7 +111,7 @@ class DashboardViewModel @Inject constructor(
                 is PracticeResult.Error -> {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = result.message
+                        error = progressResult.message
                     )
                 }
                 is PracticeResult.Loading -> {
@@ -74,22 +119,6 @@ class DashboardViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    private fun calculateStreak(data: ProgressSummaryResponse): Int {
-        // Use total sessions as a simple activity metric
-        // In a full implementation, this would track consecutive daily activity
-        return data.totalSessions.coerceAtMost(30) // Cap at 30 for display
-    }
-
-    private fun calculateXP(data: ProgressSummaryResponse): Int {
-        // XP calculation:
-        // - Base: 10 XP per correct answer
-        // - Bonus: 5 XP per session completed
-        val totalCorrect = (data.totalQuestionsAttempted * data.overallAccuracy / 100).toInt()
-        val baseXP = totalCorrect * 10
-        val sessionBonus = data.totalSessions * 5
-        return baseXP + sessionBonus
     }
 
     private fun mapTopics(
@@ -115,5 +144,133 @@ class DashboardViewModel @Inject constructor(
 
     fun refresh() {
         loadDashboardData()
+    }
+
+    /**
+     * Select a subject for SWOT analysis
+     */
+    fun selectSubject(subject: String?) {
+        _uiState.value = _uiState.value.copy(selectedSubject = subject)
+        loadConceptProgress(subject)
+    }
+
+    /**
+     * Load concept mastery data for SWOT analysis
+     */
+    private fun loadConceptProgress(subject: String?) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingConcepts = true)
+
+            // Send lowercase subject to API (backend expects lowercase)
+            val apiSubject = subject?.lowercase()
+            Timber.d("Loading concept progress for subject: $apiSubject")
+
+            when (val result = practiceRepository.getConceptProgress(apiSubject)) {
+                is PracticeResult.Success -> {
+                    Timber.d("Loaded ${result.data.concepts.size} concepts for SWOT analysis")
+                    _uiState.value = _uiState.value.copy(
+                        concepts = result.data.concepts,
+                        isLoadingConcepts = false
+                    )
+                }
+                is PracticeResult.Error -> {
+                    Timber.w("Failed to load concept progress: ${result.message}")
+                    _uiState.value = _uiState.value.copy(
+                        concepts = emptyList(),
+                        isLoadingConcepts = false
+                    )
+                }
+                is PracticeResult.Loading -> {
+                    // Already set loading state
+                }
+            }
+        }
+    }
+
+    /**
+     * Generate SWOT analysis from concept mastery data
+     */
+    fun generateSWOTAnalysis(): SWOTAnalysisData? {
+        val concepts = _uiState.value.concepts
+        if (concepts.isEmpty()) return null
+
+        val avgAccuracy = concepts.map { it.accuracy }.average().toFloat()
+        val strongTopics = concepts.filter { it.accuracy >= 70f }
+        val weakTopics = concepts.filter { it.accuracy < 60f }
+        val streak = _uiState.value.currentStreak
+        val totalAttempts = concepts.sumOf { it.totalAttempts }
+
+        // Strengths - always provide at least one insight
+        val strengths = mutableListOf<SWOTInsight>()
+        if (avgAccuracy > 75) {
+            strengths.add(SWOTInsight("Excellent Mastery", "Performing at top tier (${avgAccuracy.toInt()}%)"))
+        } else if (avgAccuracy > 50) {
+            strengths.add(SWOTInsight("Solid Foundation", "Good baseline accuracy (${avgAccuracy.toInt()}%)"))
+        } else if (avgAccuracy > 30) {
+            strengths.add(SWOTInsight("Building Up", "Making progress (${avgAccuracy.toInt()}%)"))
+        }
+        if (strongTopics.isNotEmpty()) {
+            strengths.add(SWOTInsight("Power Topics", "${strongTopics.size} concepts mastered"))
+        }
+        if (totalAttempts > 0 && strengths.isEmpty()) {
+            strengths.add(SWOTInsight("Active Learner", "$totalAttempts questions attempted"))
+        }
+        if (streak > 0 && strengths.size < 2) {
+            strengths.add(SWOTInsight("Consistent", "$streak day streak going"))
+        }
+        // Fallback if still empty
+        if (strengths.isEmpty()) {
+            strengths.add(SWOTInsight("Getting Started", "Keep practicing to build strengths"))
+        }
+
+        // Weaknesses
+        val weaknesses = mutableListOf<SWOTInsight>()
+        if (weakTopics.isNotEmpty()) {
+            val weakest = weakTopics.minByOrNull { it.accuracy }
+            if (weakest != null) {
+                weaknesses.add(SWOTInsight(weakest.displayName, "Critical focus needed (${weakest.accuracy.toInt()}%)"))
+            }
+            if (weakTopics.size > 1) {
+                weaknesses.add(SWOTInsight("Growth Areas", "${weakTopics.size} topics need review"))
+            }
+        } else {
+            weaknesses.add(SWOTInsight("No Critical Weaknesses", "Maintaining high standards"))
+        }
+
+        // Opportunities
+        val opportunities = mutableListOf<SWOTInsight>()
+        if (weakTopics.isNotEmpty()) {
+            opportunities.add(SWOTInsight("Score Booster", "Reviewing weak topics boosts total score"))
+        }
+        val unpracticed = concepts.filter { it.totalAttempts == 0 }
+        if (unpracticed.isNotEmpty()) {
+            opportunities.add(SWOTInsight("Uncharted Territory", "${unpracticed.size} new topics to explore"))
+        } else if (opportunities.isEmpty()) {
+            opportunities.add(SWOTInsight("Consistency", "Maintain your daily streak"))
+        }
+        // Fallback
+        if (opportunities.isEmpty()) {
+            opportunities.add(SWOTInsight("Keep Going", "Practice more to unlock insights"))
+        }
+
+        // Threats
+        val threats = mutableListOf<SWOTInsight>()
+        if (streak < 2) {
+            threats.add(SWOTInsight("Momentum Loss", "Try to practice daily"))
+        }
+        val critical = concepts.filter { it.accuracy < 40f && it.totalAttempts > 5 }
+        if (critical.isNotEmpty()) {
+            threats.add(SWOTInsight("Concept Gaps", "${critical.size} topics showing struggle"))
+        }
+        if (threats.isEmpty()) {
+            threats.add(SWOTInsight("All Clear", "No immediate risks detected"))
+        }
+
+        return SWOTAnalysisData(
+            strengths = strengths.take(2),
+            weaknesses = weaknesses.take(2),
+            opportunities = opportunities.take(2),
+            threats = threats.take(2)
+        )
     }
 }

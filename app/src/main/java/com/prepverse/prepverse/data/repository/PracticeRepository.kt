@@ -1,6 +1,7 @@
 package com.prepverse.prepverse.data.repository
 
 import com.prepverse.prepverse.data.remote.api.PrepVerseApi
+import com.prepverse.prepverse.data.remote.api.dto.ConceptProgressResponse
 import com.prepverse.prepverse.data.remote.api.dto.EndSessionRequest
 import com.prepverse.prepverse.data.remote.api.dto.EndSessionResponse
 import com.prepverse.prepverse.data.remote.api.dto.NextQuestionResponse
@@ -202,6 +203,25 @@ class PracticeRepository @Inject constructor(
             } else {
                 PracticeResult.Error(
                     message = response.errorBody()?.string() ?: "Failed to get progress",
+                    code = response.code()
+                )
+            }
+        } catch (e: Exception) {
+            PracticeResult.Error(message = e.message ?: "Network error")
+        }
+    }
+
+    /**
+     * Get concept mastery data for SWOT analysis
+     */
+    suspend fun getConceptProgress(subject: String? = null): PracticeResult<ConceptProgressResponse> {
+        return try {
+            val response = api.getConceptProgress(subject)
+            if (response.isSuccessful && response.body() != null) {
+                PracticeResult.Success(response.body()!!)
+            } else {
+                PracticeResult.Error(
+                    message = response.errorBody()?.string() ?: "Failed to get concept progress",
                     code = response.code()
                 )
             }
