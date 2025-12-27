@@ -142,13 +142,17 @@ async def auth_callback(request: Request, db: Client = Depends(get_db)):
     if needs_onboarding:
         redirect_url = f"{settings.FRONTEND_URL}/onboarding"
 
+    is_production = not settings.DEBUG
+    samesite_policy = "none" if is_production else "lax"
+    secure_policy = True if is_production else False
+
     response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
     response.set_cookie(
         key=settings.SESSION_COOKIE_NAME,
         value=session_token,
         httponly=True,
-        secure=not settings.DEBUG,
-        samesite="lax",
+        secure=secure_policy,
+        samesite=samesite_policy,
         max_age=settings.SESSION_MAX_AGE,
         path="/",  # Important: send cookie for all paths
     )
