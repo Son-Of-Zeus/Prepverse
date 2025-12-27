@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useDebounce } from '@/hooks/useDebounce';
-import { searchSchools, type School } from '@/api/schools';
+import { useDebounce } from '../../hooks/useDebounce';
+import { searchSchools, type School } from '../../api/schools';
 
 interface SchoolSelectorProps {
   value: string | null;
@@ -196,7 +196,7 @@ export const SchoolSelector: React.FC<SchoolSelectorProps> = ({
       {isOpen && (
         <div
           className={`
-            absolute top-full left-0 right-0 mt-2 z-50
+            relative mt-2 z-10
             bg-surface/95 backdrop-blur-xl
             border border-white/10 rounded-xl
             shadow-2xl shadow-black/50

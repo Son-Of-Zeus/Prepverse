@@ -4,6 +4,7 @@ import { CosmicBackground } from '../components/ui/CosmicBackground';
 import { useDashboard, fetchConceptMastery, ConceptMastery } from '../hooks/useDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { getRecentPractice, SubjectProgress } from '../utils/progress';
+
 import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
 import {
   LayoutDashboard, Target, Zap, Swords,
@@ -337,6 +338,7 @@ export const DashboardPage: React.FC = () => {
               <p className="text-slate-400 mt-1">Ready to continue your journey?</p>
             </div>
             <div className="flex items-center gap-4">
+
               <div className="glass px-4 py-2 rounded-xl flex items-center gap-2 border border-white/5">
                 <Flame className="text-orange-500 fill-orange-500" size={18} />
                 <span className="font-mono font-bold">{currentStreak} Day Streak</span>
