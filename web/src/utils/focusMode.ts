@@ -26,7 +26,7 @@ export class FocusMode {
   private init() {
     this.injectStyles();
     this.showRulesIntro();
-    
+
     window.addEventListener("blur", this.blurHandler);
     document.addEventListener("visibilitychange", this.visHandler);
     document.addEventListener("contextmenu", this.ctxHandler);
@@ -36,7 +36,7 @@ export class FocusMode {
 
   private enterFullscreen() {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+      document.documentElement.requestFullscreen?.().catch(() => { });
     }
   }
 
@@ -115,9 +115,9 @@ export class FocusMode {
     document.getElementById('fm-start')?.addEventListener('click', () => {
       this.removeModal();
       this.enterFullscreen();
-      setTimeout(() => { 
+      setTimeout(() => {
         this.started = true;
-        this.isShowingModal = false; 
+        this.isShowingModal = false;
       }, 1000);
     });
   }
@@ -128,8 +128,8 @@ export class FocusMode {
 
     const modal = document.createElement('div');
     modal.id = this.modalId;
-    const remaining = this.maxViolations - this.violations;
-    
+
+
     modal.innerHTML = `
       <div class="fm-content">
         <div class="fm-icon">${isFinal ? '🔄' : '🚩'}</div>
@@ -179,7 +179,7 @@ export class FocusMode {
       this.active = false;
       this.showModal("Critical violation limit reached. Access to this assessment has been revoked.", true);
       setTimeout(() => {
-        window.location.href = "/dashboard"; 
+        window.location.href = "/dashboard";
       }, 3500);
     } else {
       this.showModal(`Security Alert: ${reason}. Please maintain focus on the exam window.`, false);

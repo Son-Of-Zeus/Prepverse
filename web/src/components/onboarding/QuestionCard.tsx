@@ -51,18 +51,20 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     return () => clearTimeout(timer);
   }, [question.id]);
 
-  const subjectColors: Record<string, { bg: string; text: string; border: string }> = {
+  const defaultColor = { bg: 'bg-cosmic/10', text: 'text-cosmic', border: 'border-cosmic/30' };
+
+  const subjectColors: Record<string, typeof defaultColor> = {
     mathematics: { bg: 'bg-math/10', text: 'text-math', border: 'border-math/30' },
     math: { bg: 'bg-math/10', text: 'text-math', border: 'border-math/30' },
     physics: { bg: 'bg-physics/10', text: 'text-physics', border: 'border-physics/30' },
     chemistry: { bg: 'bg-chemistry/10', text: 'text-chemistry', border: 'border-chemistry/30' },
     biology: { bg: 'bg-biology/10', text: 'text-biology', border: 'border-biology/30' },
-    science: { bg: 'bg-cosmic/10', text: 'text-cosmic', border: 'border-cosmic/30' },
+    science: defaultColor,
   };
 
   const getSubjectColor = (subject: string) => {
     const key = subject.toLowerCase();
-    return subjectColors[key] || subjectColors.science;
+    return subjectColors[key] ?? defaultColor;
   };
 
   const colors = getSubjectColor(question.subject);

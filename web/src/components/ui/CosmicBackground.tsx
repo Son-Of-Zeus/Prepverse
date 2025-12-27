@@ -56,7 +56,7 @@ export const CosmicBackground: React.FC<CosmicBackgroundProps> = ({
         size: Math.random() * 2 + 0.5,
         opacity: Math.random() * 0.5 + 0.2,
         speed: Math.random() * 0.3 + 0.1,
-        color: colors[Math.floor(Math.random() * colors.length)],
+        color: colors[Math.floor(Math.random() * colors.length)] ?? 'rgba(255, 255, 255, 0.8)',
       }));
     };
 
