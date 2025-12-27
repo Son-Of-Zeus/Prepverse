@@ -30,6 +30,7 @@ data class School(
     val name: String,
     val state: String?,
     val district: String?,
+    val address: String?,
     val displayName: String? = null
 ) {
     /**
@@ -45,5 +46,14 @@ data class School(
                 append(")")
             }
         }
+    }
+
+    /**
+     * Get truncated address for display (first line or first 60 chars)
+     */
+    fun getShortAddress(): String? {
+        if (address.isNullOrBlank()) return null
+        val firstLine = address.split("\n", ",").firstOrNull()?.trim() ?: address
+        return if (firstLine.length > 60) firstLine.take(57) + "..." else firstLine
     }
 }

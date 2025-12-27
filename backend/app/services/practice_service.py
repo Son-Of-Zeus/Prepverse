@@ -69,6 +69,18 @@ class PracticeService:
 
     async def get_subjects(self, class_level: int) -> List[str]:
         """Get distinct subjects for a class level"""
+        # Use RPC for DISTINCT query (more efficient than fetching all and deduping in Python)
+        try:
+            result = self.db.rpc(
+                "get_distinct_subjects",
+                {"p_class_level": class_level}
+            ).execute()
+            if result.data:
+                return sorted([row["subject"] for row in result.data])
+        except Exception:
+            pass  # Fall back to original approach if RPC doesn't exist
+
+        # Fallback: fetch all and dedupe (less efficient but works without RPC)
         result = (
             self.db.table("curriculum_topics")
             .select("subject")
@@ -118,15 +130,19 @@ class PracticeService:
             count=request.question_count,
         )
 
-        # Insert session questions
-        for i, q in enumerate(questions):
+        # Insert session questions (batch insert for performance)
+        session_questions_data = [
+            {
+                "session_id": session_id,
+                "question_id": q["id"],
+                "question_order": i + 1,
+                "difficulty": q["difficulty"],
+            }
+            for i, q in enumerate(questions)
+        ]
+        if session_questions_data:
             self.db.table("practice_session_questions").insert(
-                {
-                    "session_id": session_id,
-                    "question_id": q["id"],
-                    "question_order": i + 1,
-                    "difficulty": q["difficulty"],
-                }
+                session_questions_data
             ).execute()
 
         return {

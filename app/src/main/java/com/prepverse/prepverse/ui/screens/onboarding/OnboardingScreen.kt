@@ -35,6 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import com.prepverse.prepverse.domain.model.Difficulty
 import com.prepverse.prepverse.domain.model.OnboardingQuestion
 import com.prepverse.prepverse.domain.model.School
@@ -289,6 +292,7 @@ private fun SchoolSelectionStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
             .padding(24.dp)
     ) {
         // Header
@@ -333,7 +337,7 @@ private fun SchoolSelectionStep(
                 Box(modifier = Modifier.weight(1f)) {
                     if (searchQuery.isEmpty()) {
                         Text(
-                            text = "Search by school name or affiliation code...",
+                            text = "Search by school name...",
                             style = MaterialTheme.typography.bodyLarge,
                             color = TextMuted
                         )
@@ -574,7 +578,7 @@ private fun SchoolResultCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Box(
                 modifier = Modifier
@@ -599,23 +603,26 @@ private fun SchoolResultCard(
                     color = TextPrimary,
                     fontWeight = FontWeight.Medium
                 )
-                Row {
-                    if (school.district != null || school.state != null) {
-                        Text(
-                            text = listOfNotNull(
-                                school.district,
-                                school.state
-                            ).joinToString(", "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary
-                        )
-                    }
+                if (school.district != null || school.state != null) {
+                    Text(
+                        text = listOfNotNull(
+                            school.district,
+                            school.state
+                        ).joinToString(", "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
                 }
-                Text(
-                    text = "Code: ${school.affiliationCode}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted
-                )
+                // Show address if available
+                school.getShortAddress()?.let { address ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = address,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }

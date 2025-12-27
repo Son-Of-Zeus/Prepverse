@@ -178,6 +178,7 @@ class OnboardingViewModel @Inject constructor(
             name = name,
             state = state,
             district = district,
+            address = address,
             displayName = displayName
         )
     }

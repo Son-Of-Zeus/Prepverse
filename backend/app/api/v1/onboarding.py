@@ -227,9 +227,9 @@ async def submit_onboarding_answers(
 
         db.table("onboarding_results").insert(onboarding_result).execute()
 
-        # Store individual attempt records
-        for result in evaluation.results:
-            attempt = {
+        # Store individual attempt records (batch insert for performance)
+        attempts_data = [
+            {
                 "user_id": user_data["id"],
                 "question_id": result.question_id,
                 "selected_answer": result.selected_answer,
@@ -238,7 +238,9 @@ async def submit_onboarding_answers(
                 "topic": result.topic,
                 "attempt_type": "onboarding"
             }
-            db.table("user_attempts").insert(attempt).execute()
+            for result in evaluation.results
+        ]
+        db.table("user_attempts").insert(attempts_data).execute()
 
         # Seed concept_scores from onboarding results for adaptive difficulty
         await _seed_concept_scores_from_onboarding(

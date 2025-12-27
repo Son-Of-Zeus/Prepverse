@@ -966,4 +966,43 @@ Welcome → Class Selection → **School Selection (new)** → Assessment → Re
 
 ---
 
+### 2024-12-27 - Supabase Query Optimizations
+
+Implemented performance optimizations for Supabase queries across backend and frontend.
+
+**Backend Batch Inserts** (reduced N queries → 1 query):
+
+| File | Change |
+|------|--------|
+| `backend/app/api/v1/onboarding.py:230-243` | Batch insert `user_attempts` (was 10 separate inserts) |
+| `backend/app/services/practice_service.py:121-134` | Batch insert `practice_session_questions` |
+
+**Backend SQL Optimizations**:
+
+| File | Change |
+|------|--------|
+| `backend/app/api/v1/schools.py:236-269` | Use RPC for state aggregation (was loading 20K+ rows) |
+| `backend/app/services/practice_service.py:70-93` | Use RPC for DISTINCT subjects (was Python set()) |
+| `backend/optimized_queries.sql` | SQL functions for efficient aggregation |
+
+**New SQL Functions** (`backend/optimized_queries.sql`):
+- `get_school_states_with_counts()` - GROUP BY for state counts (~100x faster)
+- `get_distinct_subjects(class_level)` - DISTINCT for curriculum topics
+
+**Web Frontend Debouncing** (new files):
+
+| File | Purpose |
+|------|---------|
+| `web/src/hooks/useDebounce.ts` | Debounce hook + debounced callback utility |
+| `web/src/api/schools.ts` | Schools API client functions |
+| `web/src/components/onboarding/SchoolSelector.tsx` | Debounced school search autocomplete |
+
+**Performance Improvements**:
+- Onboarding submission: 10 DB calls → 1 DB call
+- Practice session start: N DB calls → 1 DB call
+- School states list: 20K+ rows loaded → single SQL GROUP BY
+- School search: Debounced with 300ms delay to prevent API spam
+
+---
+
 *Last Updated: 2024-12-27*

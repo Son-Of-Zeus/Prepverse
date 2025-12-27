@@ -44,6 +44,7 @@ class SchoolSearchResult(BaseModel):
     name: str
     state: Optional[str] = None
     district: Optional[str] = None
+    address: Optional[str] = None
     # Display string for dropdown: "School Name (District, State)"
     display_name: Optional[str] = None
 

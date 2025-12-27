@@ -40,6 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_schools_state ON schools(state);
 CREATE INDEX IF NOT EXISTS idx_schools_district ON schools(district);
 CREATE INDEX IF NOT EXISTS idx_schools_affiliation_code ON schools(affiliation_code);
 CREATE INDEX IF NOT EXISTS idx_schools_name_lower ON schools(LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_schools_address ON schools USING gin (to_tsvector('english', address));
 
 -- Update trigger for updated_at
 CREATE TRIGGER update_schools_updated_at

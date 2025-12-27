@@ -43,16 +43,16 @@ def _format_display_name(name: str, district: Optional[str], state: Optional[str
 
 @router.get("/search", response_model=SchoolSearchResponse)
 async def search_schools(
-    q: str = Query(..., min_length=2, max_length=100, description="Search query"),
+    q: str = Query(..., min_length=2, max_length=100, description="School name to search"),
     state: Optional[str] = Query(None, description="Filter by state"),
     limit: int = Query(20, ge=1, le=50, description="Max results"),
     db: Client = Depends(get_db),
 ):
     """
-    Search for schools by name or affiliation code.
+    Search for schools by name.
 
     Use this endpoint for autocomplete in school selection dropdowns.
-    Returns matching schools sorted by relevance.
+    Returns matching schools sorted alphabetically by name.
 
     ---
     ## WEB FRONTEND IMPLEMENTATION NOTES:
@@ -164,41 +164,51 @@ async def search_schools(
     ---
     """
     try:
-        # Build query - search by name (contains) or affiliation code (prefix)
+        # Build query - search by name only (case-insensitive contains)
+        # Fetch more results to account for duplicates we'll filter out
         query_builder = db.table("schools").select(
-            "id, affiliation_code, name, state, district"
+            "id, affiliation_code, name, state, district, address"
         )
 
         # Apply state filter if provided
         if state:
             query_builder = query_builder.eq("state", state)
 
-        # Search by name (case-insensitive contains) or affiliation code
-        # Using ilike for case-insensitive search
-        query_builder = query_builder.or_(
-            f"name.ilike.%{q}%,affiliation_code.ilike.{q}%"
-        )
+        # Search by name only (case-insensitive contains)
+        query_builder = query_builder.ilike("name", f"%{q}%")
 
-        # Order by name and limit results
-        query_builder = query_builder.order("name").limit(limit)
+        # Order by name and fetch extra results to handle duplicates
+        query_builder = query_builder.order("name").limit(limit * 3)
 
         result = query_builder.execute()
 
-        # Format results with display names
+        # Format results with display names, removing duplicates by name
         schools = []
+        seen_names = set()
         for school in result.data:
+            # Skip duplicates (same name)
+            name_lower = school["name"].lower().strip()
+            if name_lower in seen_names:
+                continue
+            seen_names.add(name_lower)
+
             schools.append(SchoolSearchResult(
                 id=school["id"],
                 affiliation_code=school["affiliation_code"],
                 name=school["name"],
                 state=school.get("state"),
                 district=school.get("district"),
+                address=school.get("address"),
                 display_name=_format_display_name(
                     school["name"],
                     school.get("district"),
                     school.get("state")
                 )
             ))
+
+            # Stop once we have enough unique results
+            if len(schools) >= limit:
+                break
 
         return SchoolSearchResponse(
             results=schools,
@@ -223,21 +233,37 @@ async def get_states(
     Use this to populate state filter dropdown in school search.
     """
     try:
-        # Get distinct states with counts
-        # Supabase doesn't support GROUP BY directly, so we'll get all and aggregate
-        result = db.table("schools").select("state").execute()
+        # Use raw SQL with GROUP BY for efficient aggregation (avoids loading 20K+ rows)
+        result = db.rpc(
+            "get_school_states_with_counts",
+        ).execute()
 
-        # Count occurrences of each state
-        state_counts = {}
-        for row in result.data:
-            state = row.get("state")
-            if state:
-                state_counts[state] = state_counts.get(state, 0) + 1
+        # If RPC doesn't exist, fall back to optimized query
+        if not result.data:
+            # Fallback: Use a more efficient approach - only fetch distinct states
+            # and count via separate count queries (still better than loading all rows)
+            distinct_result = db.from_("schools").select("state").execute()
+            seen_states = set()
+            states = []
+            for row in distinct_result.data:
+                state = row.get("state")
+                if state and state not in seen_states:
+                    seen_states.add(state)
+                    # Get count for this state
+                    count_result = db.table("schools").select(
+                        "id", count="exact"
+                    ).eq("state", state).execute()
+                    states.append({"state": state, "count": count_result.count or 0})
 
-        # Sort by count descending
+            # Sort by count descending
+            states.sort(key=lambda x: -x["count"])
+            return StateListResponse(states=states)
+
+        # RPC returns [{state, count}, ...]
         states = [
-            {"state": state, "count": count}
-            for state, count in sorted(state_counts.items(), key=lambda x: -x[1])
+            {"state": row["state"], "count": row["count"]}
+            for row in result.data
+            if row.get("state")
         ]
 
         return StateListResponse(states=states)

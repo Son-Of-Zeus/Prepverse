@@ -13,6 +13,7 @@ data class SchoolResult(
     @Json(name = "name") val name: String,
     @Json(name = "state") val state: String?,
     @Json(name = "district") val district: String?,
+    @Json(name = "address") val address: String?,
     @Json(name = "display_name") val displayName: String?
 )
 
