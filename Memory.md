@@ -634,7 +634,7 @@ cd web && npm run dev
 ### Curriculum Data (`backend/app/curriculum/`)
 | File | Purpose |
 |------|---------|
-| `onboarding_questions.json` | 100 onboarding questions for CBSE 10 & 12 |
+| `onboarding_questions.json` | **DEPRECATED** - Now stored in database (`questions` table with `source='onboarding'`) |
 
 ### Backend Root Files
 | File | Purpose |
@@ -1005,6 +1005,35 @@ Implemented performance optimizations for Supabase queries across backend and fr
 
 ---
 
+### 2024-12-28 - Onboarding Questions Migrated to Database
+
+Migrated onboarding questions from local JSON file to Supabase database.
+
+**Database Changes**:
+- Added 100 onboarding questions to `questions` table with `source = 'onboarding'`
+- Questions are identified by `external_id` (e.g., `onb_001` to `onb_100`)
+- 50 questions for Class 10, 50 questions for Class 12
+
+**Backend Changes**:
+
+| File | Changes |
+|------|---------|
+| `backend/app/services/onboarding_service.py` | Now fetches from database instead of local JSON |
+| `backend/app/api/v1/onboarding.py` | Uses factory function, queries DB for questions |
+
+**Key Changes in onboarding_service.py**:
+- Constructor now accepts `db: Client` parameter
+- `get_random_questions()` queries `questions` table where `source = 'onboarding'`
+- Added `_db_row_to_question()` to convert DB rows to OnboardingQuestion objects
+- Replaced singleton `onboarding_service` with factory `get_onboarding_service(db)`
+
+**Migration Applied**:
+- `insert_onboarding_questions` - Inserts all 100 questions with proper fields
+
+**Note**: The local JSON file `backend/app/curriculum/onboarding_questions.json` is now deprecated and no longer used.
+
+---
+
 ### 2024-12-27 - Peer Mentoring Implementation (Android)
 
 Implemented peer mentoring feature for study collaboration between classmates.
@@ -1068,4 +1097,4 @@ Implemented peer mentoring feature for study collaboration between classmates.
 
 ---
 
-*Last Updated: 2024-12-27*
+*Last Updated: 2024-12-28*

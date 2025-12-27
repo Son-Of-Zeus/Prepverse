@@ -15,7 +15,7 @@ from app.schemas.onboarding import (
     OnboardingStatus,
     OnboardingResult,
 )
-from app.services.onboarding_service import onboarding_service
+from app.services.onboarding_service import get_onboarding_service
 
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
 
@@ -133,6 +133,7 @@ async def get_onboarding_questions(
             db.table("users").update({"class_level": class_level}).eq("id", user_data["id"]).execute()
 
         # Get random questions
+        onboarding_service = get_onboarding_service(db)
         questions = onboarding_service.get_random_questions(effective_class_level, count=10)
 
         # Convert to response format (without correct answers)
@@ -187,21 +188,27 @@ async def submit_onboarding_answers(
         user_data = user_result.data[0]
         class_level = user_data["class_level"]
 
-        # Get the original questions based on IDs
-        all_questions = onboarding_service.questions_data["questions"]
+        # Get the original questions from database based on IDs
         question_ids = [ans.question_id for ans in submission.answers]
 
-        questions = [
-            OnboardingQuestion(**q)
-            for q in all_questions
-            if q["id"] in question_ids
-        ]
+        # Query questions from database by external_id
+        questions_result = (
+            db.table("questions")
+            .select("*")
+            .eq("source", "onboarding")
+            .in_("external_id", question_ids)
+            .execute()
+        )
 
-        if len(questions) != 10:
+        if len(questions_result.data) != len(question_ids):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid question IDs in submission"
             )
+
+        # Convert to OnboardingQuestion objects
+        onboarding_service = get_onboarding_service(db)
+        questions = [onboarding_service._db_row_to_question(q) for q in questions_result.data]
 
         # Evaluate answers
         evaluation = onboarding_service.evaluate_answers(questions, submission.answers)
