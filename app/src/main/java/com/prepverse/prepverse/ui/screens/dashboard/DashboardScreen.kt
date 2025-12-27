@@ -1,9 +1,14 @@
 package com.prepverse.prepverse.ui.screens.dashboard
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,6 +18,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -295,8 +301,329 @@ fun DashboardScreen(
                         }
                     }
 
+                    // SWOT Analysis Section
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "SWOT Analysis",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Select a subject to analyze your performance",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+
+                    // Subject Tabs
+                    item {
+                        SubjectTabs(
+                            subjects = uiState.availableSubjects,
+                            selectedSubject = uiState.selectedSubject,
+                            onSubjectSelected = { viewModel.selectSubject(it) }
+                        )
+                    }
+
+                    // SWOT Analysis Content
+                    item {
+                        SWOTAnalysisSection(
+                            swotData = viewModel.generateSWOTAnalysis(),
+                            isLoading = uiState.isLoadingConcepts,
+                            hasSelectedSubject = uiState.selectedSubject != null
+                        )
+                    }
+
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubjectTabs(
+    subjects: List<String>,
+    selectedSubject: String?,
+    onSubjectSelected: (String?) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        subjects.forEach { subject ->
+            val isSelected = selectedSubject == subject
+            val subjectColor = getSubjectColor(subject)
+
+            FilterChip(
+                selected = isSelected,
+                onClick = {
+                    onSubjectSelected(if (isSelected) null else subject)
+                },
+                label = {
+                    Text(
+                        text = subject,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Surface,
+                    labelColor = TextSecondary,
+                    selectedContainerColor = subjectColor.copy(alpha = 0.2f),
+                    selectedLabelColor = subjectColor
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = SurfaceVariant,
+                    selectedBorderColor = subjectColor
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun SWOTAnalysisSection(
+    swotData: SWOTAnalysisData?,
+    isLoading: Boolean,
+    hasSelectedSubject: Boolean
+) {
+    when {
+        isLoading -> {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = ElectricCyan,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            }
+        }
+        !hasSelectedSubject -> {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GridView,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "Select a Subject",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Choose a subject above to generate your SWOT matrix.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+        swotData == null -> {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = TextMuted,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "No Data Available",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Complete practice sessions in this subject to generate analysis.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+        else -> {
+            // 2x2 SWOT Grid
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SWOTCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        title = "Strengths",
+                        type = SWOTType.STRENGTH,
+                        insights = swotData.strengths
+                    )
+                    SWOTCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        title = "Weaknesses",
+                        type = SWOTType.WEAKNESS,
+                        insights = swotData.weaknesses
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SWOTCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        title = "Opportunities",
+                        type = SWOTType.OPPORTUNITY,
+                        insights = swotData.opportunities
+                    )
+                    SWOTCard(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        title = "Threats",
+                        type = SWOTType.THREAT,
+                        insights = swotData.threats
+                    )
+                }
+            }
+        }
+    }
+}
+
+private enum class SWOTType {
+    STRENGTH, WEAKNESS, OPPORTUNITY, THREAT
+}
+
+@Composable
+private fun SWOTCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    type: SWOTType,
+    insights: List<SWOTInsight>
+) {
+    val (iconColor, bgColor, icon) = when (type) {
+        SWOTType.STRENGTH -> Triple(NeonGreen, NeonGreen.copy(alpha = 0.1f), Icons.Default.FlashOn)
+        SWOTType.WEAKNESS -> Triple(PrepVerseRed, PrepVerseRed.copy(alpha = 0.1f), Icons.Default.Warning)
+        SWOTType.OPPORTUNITY -> Triple(ElectricCyan, ElectricCyan.copy(alpha = 0.1f), Icons.Default.TrendingUp)
+        SWOTType.THREAT -> Triple(SolarGold, SolarGold.copy(alpha = 0.1f), Icons.Default.Error)
+    }
+
+    Card(
+        modifier = modifier
+            .defaultMinSize(minHeight = 140.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(iconColor, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (type == SWOTType.WEAKNESS) TextPrimary else Void,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = iconColor,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Insights
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                insights.take(2).forEach { insight ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .offset(y = 5.dp)
+                                .background(iconColor, CircleShape)
+                        )
+                        Column {
+                            Text(
+                                text = insight.label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = insight.description,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                maxLines = 2
+                            )
+                        }
                     }
                 }
             }

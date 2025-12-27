@@ -204,34 +204,8 @@ def _get_suggested_topics(db: Client, user_id: str, attempts: List[dict]) -> Lis
     
     # Sort by accuracy (lowest first - weakest topics)
     weak_topics.sort(key=lambda x: x.accuracy)
-    
-    # If no weak topics, return some default suggestions
-    if not weak_topics:
-        weak_topics = [
-            SuggestedTopic(
-                subject="Mathematics",
-                topic="Quadratic Equations",
-                progress=0.3,
-                mastery_level="learning",
-                accuracy=65.0
-            ),
-            SuggestedTopic(
-                subject="Physics",
-                topic="Electricity",
-                progress=0.4,
-                mastery_level="learning",
-                accuracy=70.0
-            ),
-            SuggestedTopic(
-                subject="Chemistry",
-                topic="Chemical Reactions",
-                progress=0.25,
-                mastery_level="beginner",
-                accuracy=55.0
-            )
-        ]
-    
-    return weak_topics[:5]  # Return top 5
+
+    return weak_topics[:5]  # Return top 5 (empty list if no weak topics)
 
 
 def _calculate_streak_info(db: Client, user_id: str) -> StreakInfo:
@@ -266,7 +240,7 @@ def _calculate_streak_info(db: Client, user_id: str) -> StreakInfo:
             except Exception:
                 continue
     
-    # Calculate current streak
+    # Calculate current streak (consecutive days from today)
     today = datetime.now().date()
     for i in range(30):
         check_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
@@ -274,9 +248,20 @@ def _calculate_streak_info(db: Client, user_id: str) -> StreakInfo:
             current_streak += 1
         else:
             break
-    
-    # Calculate longest streak (simplified)
-    longest_streak = max(current_streak, 7)  # Placeholder
+
+    # Calculate longest streak (scan all dates for longest consecutive run)
+    if dates_with_activity:
+        sorted_dates = sorted(dates_with_activity)
+        temp_streak = 1
+        for i in range(1, len(sorted_dates)):
+            prev_date = datetime.strptime(sorted_dates[i-1], "%Y-%m-%d").date()
+            curr_date = datetime.strptime(sorted_dates[i], "%Y-%m-%d").date()
+            if (curr_date - prev_date).days == 1:
+                temp_streak += 1
+                longest_streak = max(longest_streak, temp_streak)
+            else:
+                temp_streak = 1
+        longest_streak = max(longest_streak, temp_streak, current_streak)
     
     # Calculate total XP (10 XP per correct answer, 5 per attempt)
     total_xp = sum(
