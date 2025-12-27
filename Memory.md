@@ -275,12 +275,14 @@ backend/
 
 ## Key Files Quick Reference
 
-### Authentication
+### Authentication (Server-Side OAuth)
 | File | Purpose |
 |------|---------|
-| `backend/app/core/security.py` | Auth0 JWT validation |
-| `backend/app/api/v1/auth.py` | Auth endpoints |
-| `web/src/lib/auth0.ts` | Auth0 React SDK config |
+| `backend/app/core/security.py` | Cookie + JWT validation |
+| `backend/app/core/oauth.py` | Authlib OAuth client for Auth0 |
+| `backend/app/core/session.py` | Session cookie utilities |
+| `backend/app/api/v1/auth.py` | Auth endpoints (login, callback, logout, me) |
+| `web/src/hooks/useAuth.ts` | Auth hook (redirect-based, no SDK) |
 | `app/.../data/remote/AuthManager.kt` | Auth0 Android SDK wrapper |
 
 ### Onboarding (10 questions from 100)
@@ -334,9 +336,11 @@ backend/
 
 ## API Endpoints Overview
 
-### Auth (`/api/v1/auth`)
-- `POST /callback` - Auth0 callback, create/update user
-- `GET /me` - Get current user
+### Auth (`/api/v1/auth`) - Server-Side OAuth
+- `GET /login` - Redirect to Auth0/Google OAuth
+- `GET /callback` - OAuth callback, set session cookie
+- `POST /logout` - Clear session cookie
+- `GET /me` - Get current user (cookie auth)
 
 ### Onboarding (`/api/v1/onboarding`)
 - `GET /questions` - Get 10 random questions from 100
@@ -374,19 +378,18 @@ backend/
 ```
 SUPABASE_URL=
 SUPABASE_KEY=
-SUPABASE_SERVICE_KEY=
 AUTH0_DOMAIN=
-AUTH0_API_AUDIENCE=
 AUTH0_CLIENT_ID=
+AUTH0_CLIENT_SECRET=
+AUTH0_AUDIENCE=
+SESSION_SECRET_KEY=
+FRONTEND_URL=http://localhost:5173
 GEMINI_API_KEY=
 ```
 
 ### Web (`.env`)
 ```
-VITE_API_URL=
-VITE_AUTH0_DOMAIN=
-VITE_AUTH0_CLIENT_ID=
-VITE_AUTH0_AUDIENCE=
+VITE_API_URL=http://localhost:8000
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 ```
@@ -484,24 +487,12 @@ cd web && npm run dev
 - **Background**: `#0A0A0C` (void), `#121218` (deep), `#1A1A24` (surface)
 - **Accents**: Cyan `#00FFD1`, Purple `#B388FF`, Gold `#FFD54F`, Blue `#536DFE`
 
-### Auth0 Integration Files (`web/src/`)
+### Auth Integration Files (`web/src/`)
 | File | Purpose |
 |------|---------|
-| `lib/auth0.ts` | Auth0Provider configuration (domain, clientId, audience, Google OAuth) |
-| `hooks/useAuth.ts` | Custom auth hook (loginWithGoogle, logout, getAccessToken) |
-| `api/client.ts` | Axios instance with Bearer token interceptor |
+| `hooks/useAuth.ts` | Custom auth hook (loginWithGoogle redirects to backend) |
+| `api/client.ts` | Axios instance with withCredentials for cookies |
 | `api/onboarding.ts` | Onboarding API functions (getStatus, getQuestions, submit) |
-| `pages/Callback.tsx` | Auth0 callback handler with loading/error states |
-
-### Web Root Files (Auth0)
-| File | Purpose |
-|------|---------|
-| `.env.example` | Environment template for Auth0 config |
-| `AUTH0_SETUP.md` | Comprehensive Auth0 setup guide |
-| `INSTALLATION.md` | Quick installation guide |
-| `QUICKSTART.md` | 5-minute quick start guide |
-| `AUTH0_INTEGRATION_SUMMARY.md` | Complete implementation summary |
-| `SETUP_CHECKLIST.md` | Setup verification checklist |
 
 ---
 
@@ -539,6 +530,13 @@ cd web && npm run dev
 | File | Purpose |
 |------|---------|
 | `remote/AuthManager.kt` | Auth0 SDK wrapper with Google OAuth |
+| `remote/api/PrepVerseApi.kt` | Retrofit API interface for backend calls |
+| `remote/api/dto/UserDtos.kt` | User profile DTOs |
+| `remote/api/dto/QuestionDtos.kt` | Question-related DTOs |
+| `remote/api/dto/OnboardingDtos.kt` | Onboarding submission/response DTOs |
+| `repository/AuthRepository.kt` | Auth API calls with error handling |
+| `repository/OnboardingRepository.kt` | Onboarding API calls |
+| `repository/QuestionRepository.kt` | Question generation API calls |
 
 ### Domain Models (`domain/model/`)
 | File | Purpose |
@@ -550,6 +548,7 @@ cd web && npm run dev
 | File | Purpose |
 |------|---------|
 | `AppModule.kt` | Hilt module providing AuthManager |
+| `NetworkModule.kt` | Retrofit, OkHttp, Moshi configuration with auth interceptor |
 
 ---
 
@@ -565,7 +564,9 @@ cd web && npm run dev
 ### Core Modules (`backend/app/core/`)
 | File | Purpose |
 |------|---------|
-| `security.py` | Auth0 JWT validation using JWKS |
+| `security.py` | Flexible auth (cookie for web, Bearer token for mobile) |
+| `oauth.py` | Authlib OAuth client for Auth0 |
+| `session.py` | Session token creation/validation |
 | `gemini.py` | Google Gemini Flash 3 client for question generation |
 | `__init__.py` | Package initialization |
 
@@ -664,6 +665,65 @@ cd web && npm run dev
   - Added `.python-version` file (3.11)
   - Updated documentation (README.md, QUICKSTART.md)
 
+### 2024-12-25 - Server-Side OAuth Migration
+- **Backend OAuth**: Migrated from client-side Auth0 SDK to server-side OAuth
+  - Added `authlib`, `itsdangerous`, `httpx` dependencies
+  - Created `backend/app/core/oauth.py` - Authlib OAuth client for Auth0
+  - Created `backend/app/core/session.py` - Session cookie utilities
+  - Rewrote `backend/app/api/v1/auth.py` with new endpoints:
+    - `GET /login` - Redirects to Auth0/Google
+    - `GET /callback` - Exchanges code, sets HTTP-only cookie
+    - `POST /logout` - Clears session cookie
+    - `GET /me` - Returns user profile (cookie auth)
+  - Updated `backend/app/core/security.py` with `get_current_user_from_cookie()`
+  - Added `SessionMiddleware` in `main.py`
+  - New config: `AUTH0_CLIENT_SECRET`, `SESSION_SECRET_KEY`, `FRONTEND_URL`
+
+- **Web Frontend Simplified**: Removed Auth0 React SDK
+  - Removed `@auth0/auth0-react` dependency
+  - Deleted `web/src/lib/auth0.ts` and `web/src/pages/Callback.tsx`
+  - Rewrote `web/src/hooks/useAuth.ts` - now redirects to backend
+  - Updated `web/src/api/client.ts` - uses `withCredentials: true`
+  - Simplified `main.tsx` and `App.tsx` (no Auth0Provider)
+
+- **Auth Flow Change**:
+  - Old: Frontend → Auth0 SDK → Get JWT → Send Bearer token
+  - New: Frontend → Backend `/auth/login` → Auth0 → Backend `/auth/callback` → Set cookie
+
+### 2024-12-25 - Android-Backend API Integration
+- **Backend Dual Auth**: Added `get_current_user_flexible()` in `security.py`
+  - Supports both HTTP-only cookie (web) and Bearer token (mobile)
+  - Updated `/auth/me` endpoint to use flexible auth
+  - Mobile apps use JWT from Auth0 SDK directly
+
+- **Android Network Layer**: Complete Retrofit + OkHttp setup
+  - Created `NetworkModule.kt` with:
+    - Auth interceptor (adds Bearer token from Auth0)
+    - Logging interceptor for debugging
+    - Moshi JSON converter
+  - Created `PrepVerseApi.kt` Retrofit interface:
+    - `GET /api/v1/auth/me` - Get user profile
+    - `GET /api/v1/onboarding/questions` - Get onboarding questions
+    - `POST /api/v1/onboarding/submit` - Submit onboarding answers
+    - `GET /api/v1/onboarding/status` - Check onboarding status
+    - `POST /api/v1/questions/generate` - Generate AI questions
+  - Created DTOs in `data/remote/api/dto/`:
+    - `UserDtos.kt` - UserProfileResponse
+    - `QuestionDtos.kt` - QuestionResponse, GenerateQuestionsRequest/Response
+    - `OnboardingDtos.kt` - OnboardingSubmission, OnboardingResponse, OnboardingStatusResponse
+
+- **Android Repositories**: Error-handling API wrappers
+  - `AuthRepository.kt` - User profile fetching
+  - `OnboardingRepository.kt` - Questions and submission
+  - `QuestionRepository.kt` - AI question generation
+
+- **ViewModel Updates**: Real API integration
+  - `LoginViewModel.kt` - Fetches user profile from backend after Auth0 login
+  - `OnboardingViewModel.kt` - Fetches real questions, submits to backend
+
+- **Dev Config**: API base URL set to `http://10.0.2.2:8000` for Android emulator
+  - Uses `10.0.2.2` which maps to host localhost from emulator
+
 ---
 
-*Last Updated: 2024-12-24*
+*Last Updated: 2024-12-25*

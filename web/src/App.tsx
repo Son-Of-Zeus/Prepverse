@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { LoginPage, OnboardingPage, CallbackPage } from './pages';
+import { LoginPage, OnboardingPage } from './pages';
 import { useAuth } from './hooks/useAuth';
-import { setTokenGetter } from './api/client';
 import './styles/globals.css';
 
-type AppRoute = 'login' | 'onboarding' | 'dashboard' | 'callback';
+type AppRoute = 'login' | 'onboarding' | 'dashboard';
 
 /**
  * App - Root component with simple routing for demonstration
@@ -12,35 +11,26 @@ type AppRoute = 'login' | 'onboarding' | 'dashboard' | 'callback';
  * In production, this would use React Router for proper navigation
  */
 function App() {
-  // Detect initial route from URL
-  const getInitialRoute = (): AppRoute => {
-    const path = window.location.pathname;
-    if (path === '/callback') return 'callback';
-    return 'login';
-  };
-
-  const [currentRoute, setCurrentRoute] = useState<AppRoute>(getInitialRoute);
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>('login');
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
-  const { isAuthenticated, isLoading, getAccessToken } = useAuth();
-
-  // Set up API client token getter
-  useEffect(() => {
-    setTokenGetter(getAccessToken);
-  }, [getAccessToken]);
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Handle authentication state changes
   useEffect(() => {
     if (!isLoading) {
-      if (isAuthenticated && (currentRoute === 'login' || currentRoute === 'callback')) {
-        // User is authenticated, redirect to onboarding and clean up URL
-        window.history.replaceState({}, '', '/');
-        setCurrentRoute('onboarding');
-      } else if (!isAuthenticated && currentRoute !== 'login' && currentRoute !== 'callback') {
+      if (isAuthenticated) {
+        // User is authenticated - check onboarding status
+        if (user?.onboarding_completed || hasCompletedOnboarding) {
+          setCurrentRoute('dashboard');
+        } else {
+          setCurrentRoute('onboarding');
+        }
+      } else {
         // User is not authenticated, redirect to login
         setCurrentRoute('login');
       }
     }
-  }, [isAuthenticated, isLoading, currentRoute]);
+  }, [isAuthenticated, isLoading, user, hasCompletedOnboarding]);
 
   const handleOnboardingComplete = () => {
     setHasCompletedOnboarding(true);
@@ -102,7 +92,6 @@ function App() {
 
       {/* Route content */}
       {currentRoute === 'login' && <LoginPage />}
-      {currentRoute === 'callback' && <CallbackPage />}
       {currentRoute === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
       {currentRoute === 'dashboard' && (
         <div className="min-h-screen flex items-center justify-center">

@@ -1,99 +1,110 @@
-import { useAuth0 } from '@auth0/auth0-react';
-import { useCallback } from 'react';
-import { AUTH0_CONNECTIONS } from '../lib/auth0';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '../api/client';
+
+/**
+ * User profile returned from the backend
+ */
+export interface User {
+  id: string;
+  email: string;
+  full_name?: string;
+  class_level: number;
+  onboarding_completed: boolean;
+  total_questions_attempted: number;
+  correct_answers: number;
+  accuracy: number;
+  created_at: string;
+}
+
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: Error | null;
+}
 
 /**
  * Custom Auth Hook
  *
- * Wraps Auth0's useAuth0 hook with application-specific logic
- * Provides a simplified interface for authentication operations
+ * Uses server-side OAuth with HTTP-only cookies.
+ * No client-side token management required.
  */
 export const useAuth = () => {
-  const {
-    isAuthenticated,
-    isLoading,
-    user,
-    loginWithRedirect,
-    logout: auth0Logout,
-    getAccessTokenSilently,
-    error,
-  } = useAuth0();
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+    error: null,
+  });
+
+  /**
+   * Check authentication status by calling /auth/me
+   * Cookie is automatically sent by the browser
+   */
+  const checkAuth = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/auth/me');
+      setState({
+        user: response.data,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      });
+    } catch (error) {
+      // 401 is expected when not logged in
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+    }
+  }, []);
+
+  // Check auth on mount
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   /**
    * Initiate Google OAuth login
-   * Redirects user to Google sign-in page
+   * Redirects to backend login endpoint which handles the OAuth flow
    */
-  const loginWithGoogle = useCallback(async () => {
-    try {
-      await loginWithRedirect({
-        authorizationParams: {
-          connection: AUTH0_CONNECTIONS.GOOGLE,
-          // Ensure we request the necessary scopes
-          scope: 'openid profile email offline_access',
-        },
-      });
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  }, [loginWithRedirect]);
+  const loginWithGoogle = useCallback(() => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    window.location.href = `${apiUrl}/api/v1/auth/login`;
+  }, []);
 
   /**
    * Log out the current user
-   * Redirects to the home page after logout
+   * Calls backend to clear session cookie
    */
-  const logout = useCallback(() => {
-    auth0Logout({
-      logoutParams: {
-        returnTo: window.location.origin,
-      },
-    });
-  }, [auth0Logout]);
-
-  /**
-   * Get the current access token
-   * Automatically handles token refresh if needed
-   *
-   * @returns Promise resolving to the access token
-   * @throws Error if unable to get token
-   */
-  const getAccessToken = useCallback(async (): Promise<string> => {
+  const logout = useCallback(async () => {
     try {
-      const token = await getAccessTokenSilently({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-        },
-      });
-      return token;
+      await apiClient.post('/auth/logout');
     } catch (error) {
-      console.error('Error getting access token:', error);
-      throw error;
+      console.error('Logout error:', error);
+    } finally {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+      window.location.href = '/';
     }
-  }, [getAccessTokenSilently]);
+  }, []);
 
   return {
     // Auth state
-    isAuthenticated,
-    isLoading,
-    user,
-    error,
+    isAuthenticated: state.isAuthenticated,
+    isLoading: state.isLoading,
+    user: state.user,
+    error: state.error,
 
     // Auth methods
     loginWithGoogle,
     logout,
-    getAccessToken,
+    refetchUser: checkAuth,
   };
 };
-
-/**
- * Type definition for the user object returned by Auth0
- */
-export interface Auth0User {
-  sub?: string;
-  name?: string;
-  email?: string;
-  email_verified?: boolean;
-  picture?: string;
-  updated_at?: string;
-  [key: string]: unknown;
-}

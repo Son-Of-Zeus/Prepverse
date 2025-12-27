@@ -18,8 +18,18 @@ class Settings(BaseSettings):
 
     # Auth0 Settings
     AUTH0_DOMAIN: str
+    AUTH0_CLIENT_ID: str
+    AUTH0_CLIENT_SECRET: str
     AUTH0_AUDIENCE: str
     AUTH0_ALGORITHMS: list[str] = ["RS256"]
+
+    # Session Settings
+    SESSION_SECRET_KEY: str
+    SESSION_COOKIE_NAME: str = "prepverse_session"
+    SESSION_MAX_AGE: int = 604800  # 7 days in seconds
+
+    # Frontend URL (for OAuth redirects)
+    FRONTEND_URL: str = "http://localhost:5173"
 
     # Google Gemini Settings
     GEMINI_API_KEY: str
@@ -28,6 +38,7 @@ class Settings(BaseSettings):
     # CORS Settings
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
+        "http://localhost:5173",
         "http://localhost:8081",
         "exp://localhost:8081"
     ]

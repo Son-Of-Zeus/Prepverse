@@ -1,0 +1,120 @@
+# ========================
+# PrepVerse .gitignore
+# ========================
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+local.properties
+
+# ========================
+# OS Generated
+# ========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ========================
+# IDE & Editors
+# ========================
+.idea/
+!.idea/codeStyles/
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+
+# ========================
+# Android
+# ========================
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+/app/build/
+/build/
+.gradle/
+.cxx/
+.externalNativeBuild/
+/captures/
+*.hprof
+*.jks
+*.keystore
+
+# ========================
+# Python / Backend
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+*.db
+*.sqlite
+*.sqlite3
+uv.lock
+
+# ========================
+# Node.js / Web
+# ========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+/web/dist/
+/web/build/
+*.tsbuildinfo
+
+# ========================
+# Logs
+# ========================
+*.log
+logs/
+
+# ========================
+# Testing
+# ========================
+coverage/
+.nyc_output/
+
+# ========================
+# Claude Code
+# ========================
+.claude/

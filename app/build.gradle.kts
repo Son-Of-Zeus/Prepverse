@@ -26,7 +26,9 @@ android {
         buildConfigField("String", "AUTH0_DOMAIN", "\"YOUR_AUTH0_DOMAIN\"")
         buildConfigField("String", "AUTH0_CLIENT_ID", "\"YOUR_AUTH0_CLIENT_ID\"")
         buildConfigField("String", "AUTH0_SCHEME", "\"prepverse\"")
-        buildConfigField("String", "API_BASE_URL", "\"https://api.prepverse.app\"")
+        // For development, use 10.0.2.2 (Android emulator localhost) or your local IP
+        // For production, use: "https://api.prepverse.app"
+        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
     }
 
     buildTypes {

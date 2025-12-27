@@ -1,11 +1,11 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
 /**
  * API Client
  *
  * Axios instance configured with:
  * - Base URL from environment variables
- * - Authentication interceptor to add Bearer tokens
+ * - Credentials included for cookie-based authentication
  * - Error handling interceptor
  */
 
@@ -20,56 +20,16 @@ if (!apiUrl) {
 
 /**
  * Create axios instance with base configuration
+ * withCredentials: true ensures cookies are sent with cross-origin requests
  */
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: apiUrl,
+  baseURL: `${apiUrl}/api/v1`,
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 30000, // 30 second timeout
+  withCredentials: true, // Include cookies in requests
 });
-
-/**
- * Token getter function
- * This will be set by the app to provide the current access token
- */
-let getAccessToken: (() => Promise<string>) | null = null;
-
-/**
- * Set the token getter function
- * Should be called during app initialization with a function that returns the access token
- *
- * @param tokenGetter - Function that returns a promise resolving to the access token
- */
-export const setTokenGetter = (tokenGetter: () => Promise<string>) => {
-  getAccessToken = tokenGetter;
-};
-
-/**
- * Request interceptor
- * Automatically adds Bearer token to all requests
- */
-apiClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    // Only add token if we have a token getter function
-    if (getAccessToken) {
-      try {
-        const token = await getAccessToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      } catch (error) {
-        console.error('Failed to get access token:', error);
-        // Continue with request even if token fetch fails
-        // The API will return 401 if authentication is required
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 
 /**
  * Response interceptor
@@ -81,12 +41,11 @@ apiClient.interceptors.response.use(
     // Handle specific error cases
     if (error.response) {
       const status = error.response.status;
-      const message = error.response.data?.message || error.message;
+      const message = error.response.data?.detail || error.message;
 
       switch (status) {
         case 401:
-          console.error('Unauthorized - Please log in again');
-          // Could trigger a re-authentication flow here
+          console.error('Session expired - Please log in again');
           break;
         case 403:
           console.error('Forbidden - You do not have permission');

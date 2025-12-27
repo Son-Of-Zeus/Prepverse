@@ -1,17 +1,19 @@
 """
-Auth0 JWT validation and security utilities
+Auth0 JWT validation and security utilities.
+Supports both cookie-based (primary) and Bearer token (legacy) authentication.
 """
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 import requests
 from functools import lru_cache
 
 from app.config import get_settings
+from app.core.session import verify_session_token
 
 settings = get_settings()
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # Don't auto-error, we'll handle it
 
 
 @lru_cache()
@@ -88,7 +90,8 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
 
 async def get_current_user(token_payload: dict = Depends(verify_token)) -> dict:
     """
-    Extract current user information from token payload
+    Extract current user information from token payload.
+    Legacy: Used for Bearer token authentication.
     """
     user_id = token_payload.get("sub")
     email = token_payload.get("email")
@@ -104,3 +107,89 @@ async def get_current_user(token_payload: dict = Depends(verify_token)) -> dict:
         "email": email,
         "token_payload": token_payload
     }
+
+
+async def get_current_user_from_cookie(
+    request: Request,
+    prepverse_session: Optional[str] = Cookie(default=None),
+) -> dict:
+    """
+    Extract and validate user from HTTP-only session cookie.
+    Primary authentication method for web frontend.
+    """
+    if not prepverse_session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated"
+        )
+
+    user_data = verify_session_token(prepverse_session)
+
+    if not user_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session"
+        )
+
+    return user_data
+
+
+async def get_current_user_flexible(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    prepverse_session: Optional[str] = Cookie(default=None),
+) -> dict:
+    """
+    Unified authentication that accepts either:
+    1. HTTP-only session cookie (web frontend)
+    2. Bearer JWT token (mobile apps)
+
+    Tries cookie first, then falls back to Bearer token.
+    """
+    # Try cookie-based auth first (web)
+    if prepverse_session:
+        user_data = verify_session_token(prepverse_session)
+        if user_data:
+            return user_data
+
+    # Try Bearer token auth (mobile)
+    if credentials and credentials.credentials:
+        try:
+            token = credentials.credentials
+            unverified_header = jwt.get_unverified_header(token)
+            jwks = get_auth0_public_key()
+
+            rsa_key = {}
+            for key in jwks["keys"]:
+                if key["kid"] == unverified_header["kid"]:
+                    rsa_key = {
+                        "kty": key["kty"],
+                        "kid": key["kid"],
+                        "use": key["use"],
+                        "n": key["n"],
+                        "e": key["e"]
+                    }
+                    break
+
+            if rsa_key:
+                payload = jwt.decode(
+                    token,
+                    rsa_key,
+                    algorithms=settings.AUTH0_ALGORITHMS,
+                    audience=settings.AUTH0_AUDIENCE,
+                    issuer=f"https://{settings.AUTH0_DOMAIN}/"
+                )
+
+                return {
+                    "user_id": payload.get("sub"),
+                    "email": payload.get("email"),
+                    "db_id": None,  # Will be fetched from DB if needed
+                    "auth_method": "bearer"
+                }
+        except (JWTError, Exception):
+            pass  # Fall through to error
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated. Provide a valid session cookie or Bearer token."
+    )

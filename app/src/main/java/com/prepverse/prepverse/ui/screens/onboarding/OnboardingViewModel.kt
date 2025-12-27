@@ -2,6 +2,8 @@ package com.prepverse.prepverse.ui.screens.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.prepverse.prepverse.data.remote.api.dto.QuestionResponse
+import com.prepverse.prepverse.data.repository.OnboardingRepository
 import com.prepverse.prepverse.domain.model.Difficulty
 import com.prepverse.prepverse.domain.model.OnboardingQuestion
 import com.prepverse.prepverse.domain.model.QuestionAttempt
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 data class OnboardingUiState(
@@ -26,8 +29,10 @@ data class OnboardingUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val score: Int = 0,
+    val scorePercentage: Float = 0f,
     val strengths: List<String> = emptyList(),
-    val weaknesses: List<String> = emptyList()
+    val weaknesses: List<String> = emptyList(),
+    val recommendations: String = ""
 )
 
 enum class OnboardingStep {
@@ -38,13 +43,18 @@ enum class OnboardingStep {
 }
 
 @HiltViewModel
-class OnboardingViewModel @Inject constructor() : ViewModel() {
+class OnboardingViewModel @Inject constructor(
+    private val onboardingRepository: OnboardingRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
     private var timerJob: Job? = null
     private var questionStartTime: Long = 0
+
+    // Store raw API questions for submission
+    private var apiQuestions: List<QuestionResponse> = emptyList()
 
     fun selectClass(studentClass: Int) {
         _uiState.update {
@@ -59,25 +69,73 @@ class OnboardingViewModel @Inject constructor() : ViewModel() {
         val selectedClass = _uiState.value.selectedClass ?: return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
 
-            // TODO: Fetch questions from backend
-            // For now, use mock questions
-            val questions = getMockQuestions(selectedClass)
+            // Fetch questions from backend
+            onboardingRepository.getOnboardingQuestions()
+                .onSuccess { questions ->
+                    Timber.d("Fetched ${questions.size} onboarding questions from backend")
+                    apiQuestions = questions
+                    val domainQuestions = questions.map { it.toDomainModel(selectedClass) }
 
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    step = OnboardingStep.ASSESSMENT,
-                    questions = questions,
-                    currentQuestionIndex = 0,
-                    timeRemainingSeconds = 600
-                )
-            }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            step = OnboardingStep.ASSESSMENT,
+                            questions = domainQuestions,
+                            currentQuestionIndex = 0,
+                            timeRemainingSeconds = 600
+                        )
+                    }
 
-            startTimer()
-            questionStartTime = System.currentTimeMillis()
+                    startTimer()
+                    questionStartTime = System.currentTimeMillis()
+                }
+                .onFailure { error ->
+                    Timber.e(error, "Failed to fetch questions, using mock data")
+                    // Fallback to mock questions
+                    val questions = getMockQuestions(selectedClass)
+
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            step = OnboardingStep.ASSESSMENT,
+                            questions = questions,
+                            currentQuestionIndex = 0,
+                            timeRemainingSeconds = 600,
+                            error = "Using offline questions: ${error.message}"
+                        )
+                    }
+
+                    startTimer()
+                    questionStartTime = System.currentTimeMillis()
+                }
         }
+    }
+
+    /**
+     * Convert API response to domain model
+     */
+    private fun QuestionResponse.toDomainModel(studentClass: Int): OnboardingQuestion {
+        return OnboardingQuestion(
+            id = id,
+            studentClass = studentClass,
+            subject = subject,
+            topic = topic,
+            subtopic = topic, // API doesn't have subtopic, use topic
+            difficulty = when (difficulty.lowercase()) {
+                "easy" -> Difficulty.EASY
+                "medium" -> Difficulty.MEDIUM
+                "hard" -> Difficulty.HARD
+                else -> Difficulty.MEDIUM
+            },
+            question = question,
+            options = options,
+            correctAnswer = "", // Not provided in response (hidden from client)
+            explanation = "", // Not provided in response
+            timeEstimateSeconds = timeEstimateSeconds,
+            conceptTags = emptyList()
+        )
     }
 
     private fun startTimer() {
@@ -102,7 +160,14 @@ class OnboardingViewModel @Inject constructor() : ViewModel() {
         val selectedAnswer = state.selectedAnswer ?: return
 
         val timeTaken = ((System.currentTimeMillis() - questionStartTime) / 1000).toInt()
-        val isCorrect = selectedAnswer == currentQuestion.correctAnswer
+
+        // For API questions, we don't have the correct answer locally
+        // The backend will evaluate correctness
+        val isCorrect = if (apiQuestions.isNotEmpty()) {
+            false // Will be evaluated by backend
+        } else {
+            selectedAnswer == currentQuestion.correctAnswer
+        }
 
         val attempt = QuestionAttempt(
             questionId = currentQuestion.id,
@@ -134,7 +199,63 @@ class OnboardingViewModel @Inject constructor() : ViewModel() {
         timerJob?.cancel()
 
         val state = _uiState.value
+
+        // If we used API questions, submit to backend
+        if (apiQuestions.isNotEmpty()) {
+            submitToBackend()
+        } else {
+            // Local evaluation for mock questions
+            evaluateLocally()
+        }
+    }
+
+    /**
+     * Submit answers to backend for evaluation
+     */
+    private fun submitToBackend() {
+        val state = _uiState.value
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            // Build answers list from attempts
+            val answers = state.answers.mapIndexed { index, attempt ->
+                val questionId = apiQuestions.getOrNull(index)?.id ?: state.questions.getOrNull(index)?.id ?: ""
+                questionId to attempt.answer
+            }
+
+            onboardingRepository.submitOnboarding(answers)
+                .onSuccess { response ->
+                    Timber.d("Onboarding submitted successfully. Score: ${response.scorePercentage}%")
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            step = OnboardingStep.RESULTS,
+                            score = response.correctAnswers,
+                            scorePercentage = response.scorePercentage,
+                            strengths = response.strongTopics,
+                            weaknesses = response.weakTopics,
+                            recommendations = response.recommendations
+                        )
+                    }
+                }
+                .onFailure { error ->
+                    Timber.e(error, "Failed to submit to backend, evaluating locally")
+                    // Fallback to local evaluation
+                    evaluateLocally()
+                }
+        }
+    }
+
+    /**
+     * Local evaluation fallback when backend is unavailable
+     */
+    private fun evaluateLocally() {
+        val state = _uiState.value
         val score = state.answers.count { it.isCorrect }
+        val scorePercentage = if (state.questions.isNotEmpty()) {
+            (score.toFloat() / state.questions.size) * 100
+        } else 0f
 
         // Calculate strengths and weaknesses
         val topicPerformance = mutableMapOf<String, MutableList<Boolean>>()
@@ -155,11 +276,25 @@ class OnboardingViewModel @Inject constructor() : ViewModel() {
 
         _uiState.update {
             it.copy(
+                isLoading = false,
                 step = OnboardingStep.RESULTS,
                 score = score,
+                scorePercentage = scorePercentage,
                 strengths = strengths,
-                weaknesses = weaknesses
+                weaknesses = weaknesses,
+                recommendations = generateLocalRecommendations(weaknesses)
             )
+        }
+    }
+
+    /**
+     * Generate recommendations locally when backend is unavailable
+     */
+    private fun generateLocalRecommendations(weaknesses: List<String>): String {
+        return if (weaknesses.isEmpty()) {
+            "Great job! You have a solid foundation. Keep practicing to maintain your skills."
+        } else {
+            "Focus on improving these topics: ${weaknesses.joinToString(", ")}. Regular practice will help strengthen your understanding."
         }
     }
 
