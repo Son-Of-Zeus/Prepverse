@@ -15,7 +15,7 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
   isPaused = false,
 }) => {
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (isPaused) {

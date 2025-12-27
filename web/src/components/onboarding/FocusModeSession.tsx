@@ -15,12 +15,11 @@ interface FocusModeSessionProps {
 export const FocusModeSession: React.FC<FocusModeSessionProps> = ({
   settings,
   children,
-  onSessionEnd,
 }) => {
   const [showBreakModal, setShowBreakModal] = useState(false);
   const [isOnBreak, setIsOnBreak] = useState(false);
-  const [pomodoroFocusTime, setPomodoroFocusTime] = useState(0);
-  const [sessionPausedTime, setSessionPausedTime] = useState<number | null>(null);
+  const [_pomodoroFocusTime, setPomodoroFocusTime] = useState(0);
+  const [_sessionPausedTime, setSessionPausedTime] = useState<number | null>(null);
 
   const focusModeRef = useRef<FocusMode | null>(null);
   const pomodoroIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
