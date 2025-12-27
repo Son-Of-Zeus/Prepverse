@@ -13,29 +13,43 @@ export default {
           'red-glow': 'rgba(229, 57, 53, 0.4)',
           'red-deep': '#B71C1C',
           'red-light': '#FF6F60',
+          'red-muted': 'rgba(229, 57, 53, 0.1)',
         },
         // Dark Theme
-        void: '#0A0A0C',
-        deep: '#121218',
-        surface: '#1A1A24',
-        elevated: '#252532',
-        hover: '#2E2E3D',
-        // Accents
+        void: '#050507',
+        deep: '#0E0E14',
+        surface: '#15151F',
+        elevated: '#1F1F2E',
+        hover: '#2A2A3D',
+        overlay: 'rgba(5, 5, 7, 0.85)',
+
+        // Accents (Old - keep for backward compat)
         electric: '#00FFD1',
         plasma: '#B388FF',
         solar: '#FFD54F',
         cosmic: '#536DFE',
+
+        // Accents (New)
+        accent: {
+          cyan: '#06B6D4',
+          emerald: '#10B981',
+          violet: '#8B5CF6',
+          amber: '#F59E0B',
+          rose: '#F43F5E',
+        },
+
         // Subject Colors
-        math: '#FF6B6B',
-        physics: '#4ECDC4',
-        chemistry: '#9B59B6',
-        biology: '#27AE60',
-        science: '#3498DB', // Class 10 combined science (blue)
+        math: '#F43F5E',
+        physics: '#06B6D4',
+        chemistry: '#8B5CF6',
+        biology: '#10B981',
+        science: '#3498DB',
       },
       fontFamily: {
-        sans: ['Space Grotesk', 'system-ui', 'sans-serif'],
+        sans: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
         display: ['Fraunces', 'Georgia', 'serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+        body: ['Outfit', 'sans-serif'],
       },
       fontSize: {
         'display-lg': ['4.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],

@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { FocusMode } from '../../utils/focusMode';
 import { PomodoroBreakModal } from './PomodoroBreakModal';
 import { FocusModeSettings } from './FocusModeSettings';
 
@@ -22,20 +21,18 @@ export const FocusModeSession: React.FC<FocusModeSessionProps> = ({
   const [pomodoroFocusTime, setPomodoroFocusTime] = useState(0);
   const [sessionPausedTime, setSessionPausedTime] = useState<number | null>(null);
 
-  const focusModeRef = useRef<FocusMode | null>(null);
   const pomodoroIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastPomodoroFocusRef = useRef<number | null>(null);
   const interruptionStartRef = useRef<number | null>(null);
 
-  // Initialize focus mode if enabled
+  // FocusMode class removed to prevent "Secure Exam Mode" popup/lockdown.
+  // Proctoring logic is now handled globally in FocusContext.tsx
+
+  // We still track interruptions locally for Pomodoro accuracy if needed, 
+  // but we don't force fullscreen or show the modal.
   useEffect(() => {
-    if (settings.enabled) {
-      focusModeRef.current = new FocusMode();
-      return () => {
-        focusModeRef.current?.destroy();
-        document.exitFullscreen?.();
-      };
-    }
+    // Optional: We could trigger a simpler "Focus Started" toast here if we wanted
+    // but the UI context handles state.
   }, [settings.enabled]);
 
   // Handle break start
@@ -176,7 +173,6 @@ export const FocusModeSession: React.FC<FocusModeSessionProps> = ({
       if (pomodoroIntervalRef.current) {
         clearInterval(pomodoroIntervalRef.current);
       }
-      focusModeRef.current?.destroy();
     };
   }, []);
 

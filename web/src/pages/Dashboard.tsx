@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
-import { useDashboard, SuggestedTopic } from '../hooks/useDashboard';
+import { useDashboard, SuggestedTopic, fetchConceptMastery, fetchPerformanceTrend, ConceptMastery, RecentScore } from '../hooks/useDashboard';
 import { useAuth } from '../hooks/useAuth';
+import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
+import { PerformanceTrend } from '../components/dashboard/PerformanceTrend';
 
 /**
  * Dashboard Page - The home base of the PrepVerse
@@ -9,7 +11,15 @@ import { useAuth } from '../hooks/useAuth';
  * Shows user progress, streak, XP, and suggested topics.
  * Mirrors the Android dashboard data fetching using /api/v1/practice/progress/summary
  */
-export const DashboardPage: React.FC = () => {
+interface DashboardPageProps {
+  onNavigateToFocus?: () => void;
+  onNavigateToPractice?: () => void;
+}
+
+export const DashboardPage: React.FC<DashboardPageProps> = ({
+  onNavigateToFocus,
+  onNavigateToPractice,
+}) => {
   const { user, logout } = useAuth();
   const {
     isLoading,
@@ -24,6 +34,39 @@ export const DashboardPage: React.FC = () => {
     subjectScores,
     refresh,
   } = useDashboard();
+
+  // State for SWOT analysis and performance trend
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  const [concepts, setConcepts] = useState<ConceptMastery[]>([]);
+  const [performanceData, setPerformanceData] = useState<RecentScore[]>([]);
+  const [isLoadingConcepts, setIsLoadingConcepts] = useState(false);
+  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+
+  // Get available subjects from subjectScores
+  const availableSubjects = useMemo(() => Object.keys(subjectScores), [subjectScores]);
+
+  // Fetch concepts when subject changes
+  useEffect(() => {
+    if (selectedSubject) {
+      setIsLoadingConcepts(true);
+      fetchConceptMastery(selectedSubject).then((data) => {
+        setConcepts(data);
+        setIsLoadingConcepts(false);
+      });
+    } else if (availableSubjects.length > 0 && !selectedSubject) {
+      // Auto-select first subject if available
+      setSelectedSubject(availableSubjects[0] || '');
+    }
+  }, [selectedSubject, availableSubjects]);
+
+  // Fetch performance trend data
+  useEffect(() => {
+    setIsLoadingPerformance(true);
+    fetchPerformanceTrend().then((data) => {
+      setPerformanceData(data);
+      setIsLoadingPerformance(false);
+    });
+  }, []);
 
   if (isLoading) {
     return (
@@ -79,109 +122,188 @@ export const DashboardPage: React.FC = () => {
         </button>
       </header>
 
-      {/* Main Content */}
-      <main className="relative z-10 px-6 py-8 max-w-7xl mx-auto">
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            icon={<FireIcon />}
-            value={currentStreak}
-            label="Day Streak"
-            color="text-prepverse-red"
-          />
-          <StatCard
-            icon={<StarIcon />}
-            value={totalXP}
-            label="Total XP"
-            color="text-solar"
-          />
-          <StatCard
-            icon={<BookIcon />}
-            value={totalSessions}
-            label="Sessions"
-            color="text-physics"
-          />
-          <StatCard
-            icon={<TargetIcon />}
-            value={`${overallAccuracy.toFixed(0)}%`}
-            label="Accuracy"
-            color="text-biology"
-          />
-        </div>
-
-        {/* Study Time */}
-        <div className="glass rounded-2xl p-6 mb-8 animate-fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Total Study Time</p>
-              <p className="font-display text-3xl text-white">
-                {formatStudyTime(totalStudyTimeMinutes)}
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-cosmic/20 flex items-center justify-center">
-              <ClockIcon className="w-6 h-6 text-cosmic" />
+      {/* Main Layout with Sidebar */}
+      <div className="relative z-10 flex">
+        {/* Sidebar */}
+        <aside className="w-64 min-h-[calc(100vh-73px)] border-r border-white/5 bg-void/50 backdrop-blur-sm">
+          <div className="p-6 border-b border-white/5">
+            <div className="mb-4">
+              <h2 className="font-display text-lg text-white">{user?.full_name || 'Student'}</h2>
+              <p className="text-gray-400 text-sm">Class {user?.class_level || 'N/A'}</p>
             </div>
           </div>
-        </div>
+          <nav className="p-4 space-y-2">
+            <SidebarButton
+              icon={<TargetIcon />}
+              label="Focus Mode"
+              onClick={onNavigateToFocus || (() => { })}
+            />
+          </nav>
+        </aside>
 
-        {/* Subject Progress */}
-        {Object.keys(subjectScores).length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-display text-xl text-white mb-4">Subject Progress</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(subjectScores).map(([subject, score]) => (
-                <SubjectProgressCard key={subject} subject={subject} score={score} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Continue Learning */}
-        {continueLearning.length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-display text-xl text-white mb-4">Continue Learning</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {continueLearning.map((topic, index) => (
-                <TopicCard key={`${topic.subject}-${topic.topic}`} topic={topic} index={index} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Suggested Topics */}
-        {suggestedTopics.length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-display text-xl text-white mb-4">Suggested for You</h2>
-            <p className="text-gray-400 text-sm mb-4">Topics you might need more practice on</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {suggestedTopics.map((topic, index) => (
-                <TopicCard
-                  key={`${topic.subject}-${topic.topic}`}
-                  topic={topic}
-                  index={index}
-                  suggested
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Empty State */}
-        {totalSessions === 0 && (
-          <div className="glass rounded-2xl p-12 text-center">
-            <div className="w-20 h-20 rounded-full bg-prepverse-red/20 flex items-center justify-center mx-auto mb-6">
-              <RocketIcon className="w-10 h-10 text-prepverse-red" />
-            </div>
-            <h2 className="font-display text-2xl text-white mb-3">Start Your Journey</h2>
-            <p className="text-gray-400 max-w-md mx-auto mb-6">
-              Begin practicing to see your progress here. Pick a subject and topic to start learning!
-            </p>
-            <button className="px-8 py-4 bg-prepverse-red hover:bg-prepverse-red-light transition-colors rounded-xl text-white font-medium shadow-glow-sm hover:shadow-glow-md">
-              Start Practice
-            </button>
+        {/* Main Content */}
+        <main className="flex-1 px-6 py-8 max-w-7xl mx-auto">
+          {/* Stats Row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <StatCard
+              icon={<FireIcon />}
+              value={currentStreak}
+              label="Day Streak"
+              color="text-prepverse-red"
+            />
+            <StatCard
+              icon={<StarIcon />}
+              value={totalXP}
+              label="Total XP"
+              color="text-solar"
+            />
+            <StatCard
+              icon={<BookIcon />}
+              value={totalSessions}
+              label="Sessions"
+              color="text-physics"
+            />
+            <StatCard
+              icon={<TargetIcon />}
+              value={`${overallAccuracy.toFixed(0)}%`}
+              label="Accuracy"
+              color="text-biology"
+            />
           </div>
-        )}
-      </main>
+
+          {/* Study Time */}
+          <div className="glass rounded-2xl p-6 mb-8 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-400 text-sm mb-1">Total Study Time</p>
+                <p className="font-display text-3xl text-white">
+                  {formatStudyTime(totalStudyTimeMinutes)}
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-cosmic/20 flex items-center justify-center">
+                <ClockIcon className="w-6 h-6 text-cosmic" />
+              </div>
+            </div>
+          </div>
+
+          {/* Subject Progress */}
+          {Object.keys(subjectScores).length > 0 && (
+            <section className="mb-8">
+              <h2 className="font-display text-xl text-white mb-4">Subject Progress</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Object.entries(subjectScores).map(([subject, score]) => (
+                  <SubjectProgressCard key={subject} subject={subject} score={score} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Continue Learning */}
+          {continueLearning.length > 0 && (
+            <section className="mb-8">
+              <h2 className="font-display text-xl text-white mb-4">Continue Learning</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {continueLearning.map((topic, index) => (
+                  <TopicCard key={`${topic.subject}-${topic.topic}`} topic={topic} index={index} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Suggested Topics */}
+          {suggestedTopics.length > 0 && (
+            <section className="mb-8">
+              <h2 className="font-display text-xl text-white mb-4">Suggested for You</h2>
+              <p className="text-gray-400 text-sm mb-4">Topics you might need more practice on</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {suggestedTopics.map((topic, index) => (
+                  <TopicCard
+                    key={`${topic.subject}-${topic.topic}`}
+                    topic={topic}
+                    index={index}
+                    suggested
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Subject-wise SWOT Analysis */}
+          {availableSubjects.length > 0 && (
+            <section className="mb-8">
+              <h2 className="font-display text-xl text-white mb-4 flex items-center gap-2">
+                <span className="text-accent-violet"><LightningIcon /></span> Subject Insights
+              </h2>
+              <div className="glass-panel rounded-2xl p-6 mb-4">
+                <label htmlFor="subject-select" className="block text-gray-400 text-sm mb-2 font-medium">
+                  Select Subject
+                </label>
+                <select
+                  id="subject-select"
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                  className="w-full md:w-64 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-accent-violet focus:border-transparent transition-all"
+                >
+                  {availableSubjects.map((subject) => (
+                    <option key={subject} value={subject} className="bg-bg-deep text-white">
+                      {formatSubjectName(subject)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {isLoadingConcepts ? (
+                <div className="glass-panel rounded-2xl p-12 text-center animate-pulse">
+                  <div className="w-16 h-16 border-4 border-accent-violet border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-gray-400">Analyzing your performance matrix...</p>
+                </div>
+              ) : (
+                <div className="glass-panel rounded-2xl p-6 animate-fade-in">
+                  <SWOTAnalysis concepts={concepts} streak={currentStreak} />
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Performance Trend */}
+          <section className="mb-8">
+            <h2 className="font-display text-xl text-white mb-4 flex items-center gap-2">
+              <span className="text-accent-cyan"><ChartLineIcon /></span> Performance Trajectory
+            </h2>
+            {isLoadingPerformance ? (
+              <div className="glass-panel rounded-2xl p-12 text-center animate-pulse">
+                <div className="w-16 h-16 border-4 border-accent-cyan border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-gray-400">Calculating trajectory...</p>
+              </div>
+            ) : (
+              <div className="glass-panel rounded-2xl p-6 animate-scale-in">
+                <PerformanceTrend data={performanceData} />
+              </div>
+            )}
+          </section>
+
+          {/* Empty State */}
+          {totalSessions === 0 && (
+            <div className="glass-panel rounded-3xl p-12 text-center relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-b from-prepverse-red/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative z-10">
+                <div className="w-24 h-24 rounded-full bg-prepverse-red/10 flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(229,57,53,0.2)] animate-float">
+                  <RocketIcon className="w-12 h-12 text-prepverse-red" />
+                </div>
+                <h2 className="font-display text-3xl text-white mb-3">Begin Your Saga</h2>
+                <p className="text-gray-400 max-w-md mx-auto mb-8 text-lg">
+                  The universe of knowledge awaits. Select a mission to start building your legacy.
+                </p>
+                <button
+                  className="px-8 py-4 bg-gradient-to-r from-prepverse-red to-prepverse-red-deep hover:from-prepverse-red-light hover:to-prepverse-red transition-all duration-300 rounded-xl text-white font-bold text-lg shadow-[0_0_20px_rgba(229,57,53,0.4)] hover:shadow-[0_0_40px_rgba(229,57,53,0.6)] hover:-translate-y-1"
+                  onClick={onNavigateToPractice}
+                >
+                  Launch First Practice
+                </button>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 };
@@ -227,6 +349,22 @@ function getSubjectBorderColor(subject: string): string {
 }
 
 // Helper Components
+
+interface SidebarButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}
+
+const SidebarButton: React.FC<SidebarButtonProps> = ({ icon, label, onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-colors text-left"
+  >
+    <div className="w-5 h-5">{icon}</div>
+    <span className="font-medium">{label}</span>
+  </button>
+);
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -318,6 +456,18 @@ function formatStudyTime(minutes: number): string {
 
 // Icons
 
+const LightningIcon: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+);
+
+const ChartLineIcon: React.FC = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+  </svg>
+);
+
 const FireIcon: React.FC = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M12 2c.5 4-1.5 6-3 8 2 0 4 1 4 4 0 2-2 4-5 4-2 0-4-1-4-4 0-4 4-6 4-10 0-1 2-2 4-2z" />
@@ -360,5 +510,7 @@ const RocketIcon: React.FC<{ className?: string }> = ({ className }) => (
     <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
   </svg>
 );
+
+
 
 export default DashboardPage;

@@ -53,6 +53,35 @@ export interface SuggestedTopic {
 }
 
 /**
+ * Concept mastery data for SWOT analysis
+ */
+export interface ConceptMastery {
+  subject: string;
+  topic: string;
+  subtopic?: string | null;
+  display_name: string;
+  mastery_score: number;
+  total_attempts: number;
+  correct_attempts: number;
+  accuracy: number;
+  current_streak: number;
+  best_streak: number;
+  recommended_difficulty: string;
+  last_practiced_at?: string | null;
+}
+
+/**
+ * Recent score for performance trend
+ */
+export interface RecentScore {
+  date: string;
+  score: number; // percentage
+  subject: string | null;
+  topic: string | null;
+  attempts: number;
+}
+
+/**
  * Calculate streak from total sessions (simplified)
  */
 function calculateStreak(totalSessions: number): number {
@@ -150,4 +179,36 @@ export function useDashboard() {
     ...state,
     refresh: loadDashboardData,
   };
+}
+
+/**
+ * Fetch concept mastery data for a specific subject
+ */
+export async function fetchConceptMastery(subject?: string): Promise<ConceptMastery[]> {
+  try {
+    const params = subject ? { subject } : {};
+    const response = await apiClient.get<{ concepts: ConceptMastery[]; total_concepts: number }>(
+      '/practice/progress/concepts',
+      { params }
+    );
+    return response.data.concepts;
+  } catch (err) {
+    console.error('Failed to fetch concept mastery:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch performance trend data (recent scores)
+ */
+export async function fetchPerformanceTrend(): Promise<RecentScore[]> {
+  try {
+    const response = await apiClient.get<{ performance_summary: { recent_scores: RecentScore[] } }>(
+      '/dashboard'
+    );
+    return response.data.performance_summary.recent_scores || [];
+  } catch (err) {
+    console.error('Failed to fetch performance trend:', err);
+    return [];
+  }
 }

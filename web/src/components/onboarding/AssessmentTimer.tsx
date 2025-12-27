@@ -4,6 +4,7 @@ interface AssessmentTimerProps {
   totalSeconds: number;
   onTimeUp: () => void;
   isPaused?: boolean;
+  forcedTimeRemaining?: number;
 }
 
 /**
@@ -13,12 +14,22 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
   totalSeconds,
   onTimeUp,
   isPaused = false,
+  forcedTimeRemaining,
 }) => {
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Sync with forcedTimeRemaining if provided
   useEffect(() => {
-    if (isPaused) {
+    if (typeof forcedTimeRemaining === 'number') {
+      setRemainingSeconds(forcedTimeRemaining);
+    }
+  }, [forcedTimeRemaining]);
+
+  // Internal timer logic (only used if NOT forced externally)
+  useEffect(() => {
+    if (isPaused || typeof forcedTimeRemaining === 'number') {
+      // If paused or controlled externally, clean up internal interval
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
@@ -31,7 +42,6 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
           }
-
           onTimeUp();
           return 0;
         }
@@ -44,11 +54,11 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPaused, onTimeUp]);
+  }, [isPaused, onTimeUp, forcedTimeRemaining]);
 
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
-  const progress = (remainingSeconds / totalSeconds) * 100;
+  const progress = (remainingSeconds / (totalSeconds || 1)) * 100; // avoid div by zero
   const isWarning = remainingSeconds <= 60;
   const isCritical = remainingSeconds <= 30;
 
