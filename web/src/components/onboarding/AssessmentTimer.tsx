@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { FocusMode } from "../../utils/focusMode";
 
 interface AssessmentTimerProps {
   totalSeconds: number;
@@ -8,12 +9,6 @@ interface AssessmentTimerProps {
 
 /**
  * AssessmentTimer - A dramatic, visually engaging countdown timer
- *
- * Design Philosophy:
- * - Circular progress ring with gradient stroke
- * - Digital display with monospace for precision feel
- * - Warning state when time is low (changes color, pulses)
- * - Smooth animations for the countdown
  */
 export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
   totalSeconds,
@@ -22,6 +17,20 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
 }) => {
   const [remainingSeconds, setRemainingSeconds] = useState(totalSeconds);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 👇 store FocusMode instance safely
+  const fmRef = useRef<FocusMode | null>(null);
+
+  // 🎯 Enable Focus Mode when timer starts
+  useEffect(() => {
+    fmRef.current = new FocusMode();
+
+    return () => {
+      // 🧹 stop focus mode when component unmounts
+      fmRef.current?.destroy();
+      document.exitFullscreen?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (isPaused) {
@@ -37,6 +46,10 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
           }
+
+          // 🧹 stop focus mode immediately when exam ends
+          fmRef.current?.destroy();
+
           onTimeUp();
           return 0;
         }
@@ -99,7 +112,6 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
             viewBox={`0 0 ${size} ${size}`}
             className="transform -rotate-90"
           >
-            {/* Background circle */}
             <circle
               cx={size / 2}
               cy={size / 2}
@@ -109,7 +121,6 @@ export const AssessmentTimer: React.FC<AssessmentTimerProps> = ({
               strokeWidth={strokeWidth}
             />
 
-            {/* Progress circle */}
             <circle
               cx={size / 2}
               cy={size / 2}

@@ -1,110 +1,54 @@
-import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '../api/client';
+import { useCallback } from 'react';
 
-/**
- * User profile returned from the backend
- */
-export interface User {
-  id: string;
-  email: string;
-  full_name?: string;
-  class_level: number;
-  onboarding_completed: boolean;
-  total_questions_attempted: number;
-  correct_answers: number;
-  accuracy: number;
-  created_at: string;
-}
+// This keeps the export so other files don't break
+export const AUTH0_CONNECTIONS = {
+  GOOGLE: 'google-oauth2',
+};
 
-interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: Error | null;
-}
-
-/**
- * Custom Auth Hook
- *
- * Uses server-side OAuth with HTTP-only cookies.
- * No client-side token management required.
- */
 export const useAuth = () => {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: true,
-    error: null,
-  });
+  // We hardcode these to TRUE and FALSE to bypass the login screen
+  const isAuthenticated = true;
+  const isLoading = false;
+  const error = null;
 
-  /**
-   * Check authentication status by calling /auth/me
-   * Cookie is automatically sent by the browser
-   */
-  const checkAuth = useCallback(async () => {
-    try {
-      const response = await apiClient.get('/auth/me');
-      setState({
-        user: response.data,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      // 401 is expected when not logged in
-      setState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      });
-    }
+  // Mock user data so the UI has something to display
+  const user = {
+    name: "Guest Student",
+    email: "guest@prepverse.com",
+    picture: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
+    email_verified: true,
+  };
+
+  const loginWithGoogle = useCallback(async () => {
+    console.log('Mock login triggered');
   }, []);
 
-  // Check auth on mount
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
-  /**
-   * Initiate Google OAuth login
-   * Redirects to backend login endpoint which handles the OAuth flow
-   */
-  const loginWithGoogle = useCallback(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    window.location.href = `${apiUrl}/api/v1/auth/login`;
+  const logout = useCallback(() => {
+    console.log('Mock logout triggered');
+    window.location.href = '/';
   }, []);
 
-  /**
-   * Log out the current user
-   * Calls backend to clear session cookie
-   */
-  const logout = useCallback(async () => {
-    try {
-      await apiClient.post('/auth/logout');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      });
-      window.location.href = '/';
-    }
+  const getAccessToken = useCallback(async (): Promise<string> => {
+    return "mock-access-token";
   }, []);
 
   return {
-    // Auth state
-    isAuthenticated: state.isAuthenticated,
-    isLoading: state.isLoading,
-    user: state.user,
-    error: state.error,
-
-    // Auth methods
+    isAuthenticated,
+    isLoading,
+    user,
+    error,
     loginWithGoogle,
     logout,
-    refetchUser: checkAuth,
+    getAccessToken,
   };
 };
+
+export interface Auth0User {
+  sub?: string;
+  name?: string;
+  email?: string;
+  email_verified?: boolean;
+  picture?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
