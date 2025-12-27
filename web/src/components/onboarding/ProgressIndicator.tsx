@@ -30,7 +30,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           const questionNum = index + 1;
           const isCompleted = answeredQuestions.has(questionNum);
           const isCurrent = questionNum === current;
-          const isUpcoming = questionNum > current;
+
 
           return (
             <div

@@ -55,7 +55,17 @@ async def auth_callback(request: Request, db: Client = Depends(get_db)):
     - Android: Redirects to deep link with session token
     """
     # Get platform from session (set in /login)
-    platform = request.session.get("oauth_platform", "web")
+    # Get platform from session (set in /login)
+    platform = request.session.get("oauth_platform")
+    
+    # Fallback: if session lost, infer from request URL
+    if not platform:
+        # Check if running on Android Emulator local IP (127.0.0.1) or Android IP (10.0.2.2)
+        host = request.headers.get("host", "")
+        if "127.0.0.1" in host or "10.0.2.2" in host:
+             platform = "android"
+        else:
+             platform = "web"
 
     # Helper to build error redirect based on platform
     def error_redirect(error: str):
