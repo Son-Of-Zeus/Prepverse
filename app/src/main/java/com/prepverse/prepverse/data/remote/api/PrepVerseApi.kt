@@ -1,5 +1,6 @@
 package com.prepverse.prepverse.data.remote.api
 
+import com.prepverse.prepverse.data.remote.api.dto.DashboardResponse
 import com.prepverse.prepverse.data.remote.api.dto.GenerateQuestionsRequest
 import com.prepverse.prepverse.data.remote.api.dto.GenerateQuestionsResponse
 import com.prepverse.prepverse.data.remote.api.dto.OnboardingResponse
@@ -69,12 +70,14 @@ interface PrepVerseApi {
     ): Response<GenerateQuestionsResponse>
 
     // ================================
-    // Progress Endpoints
+    // Dashboard Endpoints
     // ================================
 
-    // TODO: Add progress endpoints when backend implements them
-    // @GET("api/v1/progress/dashboard")
-    // suspend fun getDashboard(): Response<DashboardResponse>
+    /**
+     * Get dashboard data including performance summary, suggested topics, streak, and XP
+     */
+    @GET("api/v1/dashboard")
+    suspend fun getDashboard(): Response<DashboardResponse>
 
     // ================================
     // Focus Endpoints

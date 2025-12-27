@@ -85,8 +85,7 @@ fun PrepVerseNavGraph(
             DashboardScreen(
                 onNavigateToPractice = { navController.navigate(Routes.Practice.route) },
                 onNavigateToFocus = { navController.navigate(Routes.FocusMode.route) },
-                onNavigateToProgress = { navController.navigate(Routes.Progress.route) },
-                onNavigateToPeer = { navController.navigate(Routes.PeerLobby.route) }
+                onNavigateToBattle = { navController.navigate(Routes.PeerLobby.route) }
             )
         }
 
