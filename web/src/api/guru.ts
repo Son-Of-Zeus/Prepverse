@@ -174,6 +174,25 @@ export async function getActiveGuruSession(): Promise<ActiveSessionResponse> {
   return response.data;
 }
 
+/**
+ * Upload audio for speech-to-text transcription using Groq Whisper API
+ * @param audioBlob - Audio blob (webm, ogg, mp3, wav, m4a)
+ * @returns Transcribed text
+ */
+export async function uploadAudioForTranscription(audioBlob: Blob): Promise<string> {
+  const formData = new FormData();
+  // Use .webm extension - backend needs this to identify file type
+  formData.append('file', audioBlob, 'recording.webm');
+  
+  // Must explicitly unset Content-Type so axios can set multipart/form-data with boundary
+  const response = await apiClient.post<{ text: string }>('/guru/stt', formData, {
+    headers: {
+      'Content-Type': undefined,
+    },
+  });
+  return response.data.text;
+}
+
 // =============================================================================
 // Utility Functions
 // =============================================================================

@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
+    # Groq Settings (for Whisper STT)
+    GROQ_API_KEY: str = ""
+
     # CORS Settings
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000", 
