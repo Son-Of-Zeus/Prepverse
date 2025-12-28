@@ -10,7 +10,6 @@ import {
   LayoutDashboard,
   Target,
   Zap,
-  Swords,
   LogOut,
   School,
 } from 'lucide-react';
@@ -32,7 +31,6 @@ const SideNav = () => {
     { label: 'Start Practice', icon: Target, path: '/practice' },
     { label: 'Focus Mode', icon: Zap, path: '/focus' },
     { label: 'Peer Study', icon: Users, path: '/peer' },
-    { label: 'Start Battle', icon: Swords, path: '/battle', disabled: true },
   ];
 
   return (
