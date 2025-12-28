@@ -12,13 +12,19 @@ Endpoints:
 - GET /history: Get past Guru sessions
 - GET /session/{session_id}: Get details of a specific session
 - GET /active: Check for active session
+- POST /stt: Speech-to-text transcription using Groq Whisper
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from typing import Optional
+import os
+import tempfile
+import shutil
+import logging
 
 from app.core.security import get_current_user_flexible, get_db_user_id
 from app.db.session import get_db
 from app.services.guru_service import get_guru_service
+from app.config import get_settings
 from app.schemas.guru import (
     GuruSessionCreate,
     GuruSessionResponse,
@@ -31,6 +37,114 @@ from app.schemas.guru import (
 )
 
 router = APIRouter(prefix="/guru", tags=["guru"])
+
+
+# =============================================================================
+# Speech-to-Text (Groq Whisper)
+# =============================================================================
+
+
+@router.post("/stt")
+async def speech_to_text(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_flexible),
+):
+    """
+    Convert audio file to text using Groq Whisper API.
+    
+    Accepts audio files (webm, ogg, mp3, wav, m4a) and returns transcribed text.
+    This endpoint is designed to work as a proxy for browser-based STT,
+    avoiding CORS issues and browser incompatibility.
+    
+    Args:
+        file: Audio file upload (supports webm, ogg, mp3, wav, m4a)
+        
+    Returns:
+        JSON with transcribed text: { "text": "transcription..." }
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Get API key from settings
+    settings = get_settings()
+    api_key = settings.GROQ_API_KEY
+    if not api_key:
+        logger.error("GROQ_API_KEY not found in environment")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GROQ_API_KEY not configured"
+        )
+    
+    # Validate file type
+    allowed_extensions = ['.webm', '.ogg', '.mp3', '.wav', '.m4a', '.mp4', '.mpeg', '.mpga']
+    filename = file.filename or "recording.webm"
+    file_ext = os.path.splitext(filename)[1].lower()
+    
+    logger.info(f"STT request received: filename={filename}, content_type={file.content_type}")
+    
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file format. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    temp_file_path = None
+    try:
+        # Import Groq client
+        from groq import Groq
+        client = Groq(api_key=api_key)
+        
+        # Read file content first
+        file_content = await file.read()
+        logger.info(f"File size: {len(file_content)} bytes")
+        
+        if len(file_content) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Empty audio file received"
+            )
+        
+        # Create temporary file to store the upload
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+            temp_file_path = temp_file.name
+            temp_file.write(file_content)
+        
+        logger.info(f"Temp file created: {temp_file_path}")
+        
+        # Transcribe using Groq Whisper
+        with open(temp_file_path, "rb") as audio_file:
+            transcription = client.audio.transcriptions.create(
+                file=(filename, audio_file.read()),
+                model="whisper-large-v3-turbo",
+                response_format="text",
+            )
+        
+        logger.info(f"Transcription successful: {transcription[:50] if transcription else 'empty'}...")
+        
+        # Return transcribed text
+        return {"text": transcription.strip() if isinstance(transcription, str) else transcription}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"STT error: {error_msg}", exc_info=True)
+        if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid GROQ API key"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Transcription failed: {error_msg}"
+        )
+    finally:
+        # Clean up temp file
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
 
 
 # =============================================================================
