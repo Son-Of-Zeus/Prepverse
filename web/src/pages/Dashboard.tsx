@@ -8,8 +8,8 @@ import { getRecentPractice, SubjectProgress } from '../utils/progress';
 import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
 import {
   LayoutDashboard, Target, Zap, Users,
-  LogOut, Flame, Star, BookOpen, Clock,
-  ArrowRight, Trophy, Activity, TrendingUp, MessageSquare
+  LogOut, Flame, Star, BookOpen,
+  ArrowRight, Trophy, Activity, MessageSquare
 } from 'lucide-react';
 import { forumApi } from '../api/forum';
 
@@ -20,7 +20,7 @@ const SideNav = () => {
   const location = useLocation();
   const { user } = useAuth();
 
-  const navItems = [
+  const navItems: Array<{ label: string; icon: typeof LayoutDashboard; path: string; disabled?: boolean }> = [
     { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Start Practice', icon: Target, path: '/practice' },
     { label: 'Discussion', icon: MessageSquare, path: '/discussion' },

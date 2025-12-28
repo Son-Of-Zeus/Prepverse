@@ -208,18 +208,6 @@ const SubjectBadge: React.FC<SubjectBadgeProps> = ({ label, color, position, del
   </div>
 );
 
-interface StatItemProps {
-  value: string;
-  label: string;
-}
-
-const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
-  <div className="text-center">
-    <div className="font-display text-xl text-white font-bold">{value}</div>
-    <div className="font-mono text-xs text-gray-500 uppercase">{label}</div>
-  </div>
-);
-
 const ShieldIcon: React.FC = () => (
   <svg
     width="16"

@@ -19,7 +19,7 @@ import { useAuth } from '../hooks/useAuth';
 const SideNav = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, logout } = useAuth();
+    const { logout } = useAuth();
 
     const navItems = [
         { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },

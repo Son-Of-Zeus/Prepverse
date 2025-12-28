@@ -26,7 +26,7 @@ const SideNav = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  const navItems = [
+  const navItems: Array<{ label: string; icon: typeof LayoutDashboard; path: string; disabled?: boolean }> = [
     { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Start Practice', icon: Target, path: '/practice' },
     { label: 'Focus Mode', icon: Zap, path: '/focus' },
