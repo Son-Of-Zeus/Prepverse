@@ -6,7 +6,7 @@ export { PracticePage } from './PracticePage';
 export { PracticeSession } from './PracticeSession';
 export { PracticeResults } from './PracticeResults';
 export { FocusModePage } from './FocusMode';
-export { BattlePage } from './Battle';
+
 export { PracticeSelectionPage } from './PracticeSelection';
 export { PeerLobby } from './PeerLobby';
 export { StudyRoom } from './StudyRoom';

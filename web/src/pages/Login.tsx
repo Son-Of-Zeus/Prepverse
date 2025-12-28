@@ -78,35 +78,6 @@ export const LoginPage: React.FC = () => {
               position="bottom-0 right-0"
               delay={600}
             />
-
-            {/* Central feature card */}
-            <div
-              className="glass rounded-3xl p-8 animate-fade-in"
-              style={{ animationDelay: '0.3s' }}
-            >
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-prepverse-red animate-pulse" />
-                  <span className="font-mono text-sm text-gray-400 uppercase tracking-widest">
-                    Live Learning
-                  </span>
-                </div>
-
-                <h3 className="font-display text-2xl text-white">
-                  Join 10,000+ students
-                  <br />
-                  preparing smarter
-                </h3>
-
-                <div className="flex items-center gap-4 pt-4 border-t border-white/10">
-                  <StatItem value="94%" label="Success Rate" />
-                  <div className="w-px h-10 bg-white/10" />
-                  <StatItem value="50K+" label="Questions" />
-                  <div className="w-px h-10 bg-white/10" />
-                  <StatItem value="24/7" label="Access" />
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

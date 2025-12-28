@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, BattlePage, PracticeSelectionPage, PeerLobby, StudyRoom } from './pages';
+import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, PracticeSelectionPage, PeerLobby, StudyRoom } from './pages';
 import { DiscussionFeed } from './pages/DiscussionFeed';
 import { DiscussionThread } from './pages/DiscussionThread';
 import { useAuth } from './hooks/useAuth';
@@ -124,16 +124,6 @@ function AppContent() {
           element={
             isAuthenticated
               ? (user?.onboarding_completed ? <FocusModePage onNavigateBack={() => navigate('/dashboard')} /> : <Navigate to="/onboarding" />)
-              : <Navigate to="/login" />
-          }
-        />
-
-        {/* Battle Route */}
-        <Route
-          path="/battle"
-          element={
-            isAuthenticated
-              ? (user?.onboarding_completed ? <BattlePage onNavigateBack={() => navigate('/dashboard')} /> : <Navigate to="/onboarding" />)
               : <Navigate to="/login" />
           }
         />
