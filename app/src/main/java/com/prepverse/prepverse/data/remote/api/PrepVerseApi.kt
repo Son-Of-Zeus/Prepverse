@@ -1,6 +1,14 @@
 package com.prepverse.prepverse.data.remote.api
 
 import com.prepverse.prepverse.data.remote.api.dto.ConceptProgressResponse
+import com.prepverse.prepverse.data.remote.api.dto.CreateCommentRequest
+import com.prepverse.prepverse.data.remote.api.dto.CreatePostRequest
+import com.prepverse.prepverse.data.remote.api.dto.ForumCommentResponse
+import com.prepverse.prepverse.data.remote.api.dto.ForumPostDetailResponse
+import com.prepverse.prepverse.data.remote.api.dto.ForumPostListResponse
+import com.prepverse.prepverse.data.remote.api.dto.ForumPostResponse
+import com.prepverse.prepverse.data.remote.api.dto.VoteRequest
+import com.prepverse.prepverse.data.remote.api.dto.VoteResultResponse
 import com.prepverse.prepverse.data.remote.api.dto.DashboardResponse
 import com.prepverse.prepverse.data.remote.api.dto.EndSessionRequest
 import com.prepverse.prepverse.data.remote.api.dto.EndSessionResponse
@@ -331,4 +339,74 @@ interface PrepVerseApi {
     suspend fun getWhiteboardState(
         @Path("sessionId") sessionId: String
     ): Response<com.prepverse.prepverse.data.remote.api.dto.WhiteboardStateResponse>
+
+    // ================================
+    // Forum Endpoints
+    // ================================
+
+    /**
+     * Get paginated list of forum posts
+     * @param category Filter by category (optional)
+     * @param search Search in title/content (optional)
+     * @param page Page number (default 1)
+     * @param limit Items per page (default 20)
+     */
+    @GET("api/v1/forum/")
+    suspend fun getForumPosts(
+        @Query("category") category: String? = null,
+        @Query("search") search: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20
+    ): Response<ForumPostListResponse>
+
+    /**
+     * Create a new forum post
+     */
+    @POST("api/v1/forum/")
+    suspend fun createForumPost(
+        @Body request: CreatePostRequest
+    ): Response<ForumPostResponse>
+
+    /**
+     * Get post details including all comments
+     */
+    @GET("api/v1/forum/{postId}")
+    suspend fun getForumPostDetails(
+        @Path("postId") postId: String
+    ): Response<ForumPostDetailResponse>
+
+    /**
+     * Delete a forum post (owner only)
+     */
+    @retrofit2.http.DELETE("api/v1/forum/{postId}")
+    suspend fun deleteForumPost(
+        @Path("postId") postId: String
+    ): Response<Unit>
+
+    /**
+     * Add a comment to a post
+     */
+    @POST("api/v1/forum/{postId}/comments")
+    suspend fun createForumComment(
+        @Path("postId") postId: String,
+        @Body request: CreateCommentRequest
+    ): Response<ForumCommentResponse>
+
+    /**
+     * Vote on a post
+     */
+    @POST("api/v1/forum/{postId}/vote")
+    suspend fun voteOnPost(
+        @Path("postId") postId: String,
+        @Body request: VoteRequest
+    ): Response<VoteResultResponse>
+
+    /**
+     * Vote on a comment
+     */
+    @POST("api/v1/forum/comments/{commentId}/vote")
+    suspend fun voteOnComment(
+        @Path("commentId") commentId: String,
+        @Body request: VoteRequest
+    ): Response<VoteResultResponse>
 }

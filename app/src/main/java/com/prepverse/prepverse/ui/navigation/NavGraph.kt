@@ -15,6 +15,9 @@ import com.prepverse.prepverse.ui.screens.auth.LoginScreen
 import com.prepverse.prepverse.ui.screens.auth.LoginViewModel
 import com.prepverse.prepverse.ui.screens.dashboard.DashboardScreen
 import com.prepverse.prepverse.ui.screens.focus.FocusModeScreen
+import com.prepverse.prepverse.ui.screens.forum.CreatePostScreen
+import com.prepverse.prepverse.ui.screens.forum.ForumListScreen
+import com.prepverse.prepverse.ui.screens.forum.PostDetailScreen
 import com.prepverse.prepverse.ui.screens.onboarding.OnboardingScreen
 import com.prepverse.prepverse.ui.screens.onboarding.OnboardingViewModel
 import com.prepverse.prepverse.ui.screens.permission.PermissionScreen
@@ -99,7 +102,8 @@ fun PrepVerseNavGraph(
                 },
                 onNavigateToFocus = { navController.navigate(Routes.FocusMode.route) },
                 onNavigateToProgress = { navController.navigate(Routes.Progress.route) },
-                onNavigateToPeer = { navController.navigate(Routes.PeerLobby.route) }
+                onNavigateToPeer = { navController.navigate(Routes.PeerLobby.route) },
+                onNavigateToForum = { navController.navigate(Routes.Forum.route) }
             )
         }
 
@@ -203,6 +207,42 @@ fun PrepVerseNavGraph(
             // Pass sessionId to ViewModel via SavedStateHandle
             com.prepverse.prepverse.ui.screens.peer.StudyRoomScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // Forum screens
+        composable(Routes.Forum.route) {
+            ForumListScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPost = { postId ->
+                    navController.navigate(Routes.ForumPost.createRoute(postId))
+                },
+                onNavigateToCreatePost = {
+                    navController.navigate(Routes.CreatePost.route)
+                }
+            )
+        }
+
+        composable(
+            route = Routes.ForumPost.route,
+            arguments = listOf(navArgument("postId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val postId = backStackEntry.arguments?.getString("postId") ?: ""
+            PostDetailScreen(
+                postId = postId,
+                currentUserId = null, // TODO: Get current user ID from auth state
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.CreatePost.route) {
+            CreatePostScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onPostCreated = { postId ->
+                    navController.navigate(Routes.ForumPost.createRoute(postId)) {
+                        popUpTo(Routes.Forum.route)
+                    }
+                }
             )
         }
     }
