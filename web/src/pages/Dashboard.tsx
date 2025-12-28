@@ -538,11 +538,28 @@ function getSubjectBorderColor(subject: string): string {
 }
 
 const TopicCard = ({ topic, suggested }: any) => {
+  const navigate = useNavigate();
   const borderColor = getSubjectBorderColor(topic.subject);
   const displaySubject = formatSubjectName(topic.subject);
 
+  const handleClick = () => {
+    // Navigate to practice page with topic pre-selected to open config wizard
+    navigate('/practice', {
+      state: {
+        preSelectedTopic: {
+          id: topic.topic,
+          subject: topic.subject,
+          topic: topic.topic,
+          display_name: topic.displayName,
+          question_count: 10
+        }
+      }
+    });
+  };
+
   return (
     <div
+      onClick={handleClick}
       className={`glass rounded-2xl p-5 border-l-4 ${borderColor.split(' ')[0]} hover:bg-white/5 transition-all cursor-pointer group`}
     >
       <div className="flex items-start justify-between mb-3">
