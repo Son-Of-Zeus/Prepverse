@@ -46,7 +46,9 @@ async def login(request: Request, platform: str = "web", api_base_url: str = Non
             # Web: requests come through Vite proxy, use frontend URL
             redirect_uri = f"{settings.FRONTEND_URL}/api/v1/auth/callback"
     else:
-        redirect_uri = request.url_for("auth_callback")
+        # Production: use HTTPS with the request host
+        host = request.headers.get("host", "")
+        redirect_uri = f"https://{host}/api/v1/auth/callback"
 
     return await oauth.auth0.authorize_redirect(
         request,
