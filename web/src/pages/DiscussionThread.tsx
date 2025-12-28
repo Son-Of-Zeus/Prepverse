@@ -4,7 +4,7 @@ import { CosmicBackground } from '../components/ui/CosmicBackground';
 import { forumApi } from '../api/forum';
 import { PostDetail } from '../types/forum';
 import { VoteType } from '../types/forum';
-import { ArrowLeft, ChevronUp, ChevronDown, CheckCircle, Clock, Share2, Flag } from 'lucide-react';
+import { ArrowLeft, ChevronUp, ChevronDown, Clock, Share2, Flag } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '../components/ui/Skeleton';
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import { apiClient } from '../api/client';
 import { CosmicBackground } from '../components/ui/CosmicBackground';
@@ -355,15 +355,27 @@ const LoadingSkeleton = () => (
 
 export const PracticePage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
 
+    // Check for pre-selected topic from navigation state (e.g., from dashboard)
+    const preSelectedTopic = (location.state as any)?.preSelectedTopic as TopicInfo | undefined;
+
     // Data State
-    const [activeSubject, setActiveSubject] = useState<string>('mathematics');
-    const [selectedTopic, setSelectedTopic] = useState<TopicInfo | null>(null);
+    const [activeSubject, setActiveSubject] = useState<string>(preSelectedTopic?.subject || 'mathematics');
+    const [selectedTopic, setSelectedTopic] = useState<TopicInfo | null>(preSelectedTopic || null);
     const [topics, setTopics] = useState<TopicInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [subjects, setSubjects] = useState<string[]>([]);
+
+    // Clear navigation state after consuming preSelectedTopic
+    useEffect(() => {
+        if (preSelectedTopic) {
+            // Replace current history entry to clear the state
+            window.history.replaceState({}, document.title);
+        }
+    }, [preSelectedTopic]);
 
     // Fetch Data
     useEffect(() => {
@@ -379,7 +391,8 @@ export const PracticePage = () => {
                 const uniqueSubjects = Array.from(new Set(topicsList.map(t => t.subject)));
                 setSubjects(uniqueSubjects);
 
-                if (uniqueSubjects.length > 0) {
+                // Only set first subject if no preSelectedTopic
+                if (uniqueSubjects.length > 0 && !preSelectedTopic) {
                     setActiveSubject(uniqueSubjects[0] as string);
                 }
             } catch (err: any) {

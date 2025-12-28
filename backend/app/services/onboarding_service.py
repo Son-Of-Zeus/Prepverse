@@ -24,6 +24,7 @@ class OnboardingService:
     def get_random_questions(self, class_level: int, count: int = 10) -> List[OnboardingQuestion]:
         """
         Get random questions for the specified class level from the database.
+        Questions are distributed equally among subjects, with randomization within each subject.
 
         Args:
             class_level: CBSE class (10 or 12)
@@ -49,8 +50,48 @@ class OnboardingService:
         if len(class_questions) < count:
             raise ValueError(f"Not enough questions for class {class_level}. Found {len(class_questions)}, need {count}")
 
-        # Randomly select questions
-        selected = random.sample(class_questions, count)
+        # Group questions by subject
+        # Class 10: mathematics, science (as single subjects)
+        # Class 12: mathematics, physics, chemistry, biology (separate subjects)
+        questions_by_subject: Dict[str, List[Dict[str, Any]]] = {}
+
+        for q in class_questions:
+            subject = q["subject"]
+
+            if subject not in questions_by_subject:
+                questions_by_subject[subject] = []
+            questions_by_subject[subject].append(q)
+
+        subjects = list(questions_by_subject.keys())
+        num_subjects = len(subjects)
+
+        if num_subjects == 0:
+            raise ValueError(f"No subjects found for class {class_level}")
+
+        # Calculate equal distribution: base count per subject + distribute remainder
+        base_per_subject = count // num_subjects
+        remainder = count % num_subjects
+
+        selected: List[Dict[str, Any]] = []
+
+        # Shuffle subjects so remainder distribution is random each time
+        random.shuffle(subjects)
+
+        for i, subject in enumerate(subjects):
+            subject_questions = questions_by_subject[subject]
+
+            # First 'remainder' subjects get one extra question
+            questions_needed = base_per_subject + (1 if i < remainder else 0)
+
+            # Make sure we have enough questions in this subject
+            available = len(subject_questions)
+            questions_to_pick = min(questions_needed, available)
+
+            # Randomly select from this subject
+            selected.extend(random.sample(subject_questions, questions_to_pick))
+
+        # Shuffle the final selection so subjects aren't grouped together
+        random.shuffle(selected)
 
         # Convert database rows to OnboardingQuestion objects
         return [self._db_row_to_question(q) for q in selected]
@@ -139,7 +180,7 @@ class OnboardingService:
 
             if accuracy < 50:
                 weak_topics.append(topic)
-            elif accuracy >= 75:
+            elif accuracy >= 70:  # 70% threshold to match Android app
                 strong_topics.append(topic)
 
         # Generate recommendations

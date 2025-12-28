@@ -39,6 +39,7 @@ export function StudyRoom() {
     setCurrentUser,
     fetchParticipants,
   } = usePeer();
+  // currentSession is used in JSX and in usePeerStore.getState() calls
   const { messages, sendMessage } = usePeerChat();
   const { operations, drawLine, addText, eraseItems, clearAll } = usePeerWhiteboard();
   const { blockUser, reportUser } = usePeerSafety();
@@ -116,7 +117,6 @@ export function StudyRoom() {
       // Only leave if:
       // 1. User explicitly clicked leave (intentionalLeaveRef.current is true), OR
       // 2. User is navigating away from this page (not a React StrictMode remount)
-      const { currentSession } = usePeerStore.getState();
 
       // If we haven't actually joined yet, don't try to leave
       if (!hasJoined) return;
@@ -128,15 +128,12 @@ export function StudyRoom() {
       // Use setTimeout to ensure this doesn't run on React StrictMode remounts
       // StrictMode remounts happen synchronously, so a timeout lets us check
       // if the component remounted
-      const timeoutId = setTimeout(() => {
+      setTimeout(() => {
         const stillInSession = usePeerStore.getState().currentSession?.id === currentSessionId;
         if (stillInSession) {
           leaveSession();
         }
       }, 100);
-
-      // This will be called if component remounts before timeout fires
-      return () => clearTimeout(timeoutId);
     };
   }, [sessionId, leaveSession]);
 

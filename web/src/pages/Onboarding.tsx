@@ -575,15 +575,28 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
   const calculateResults = () => {
     if (evaluationResult) {
       const subjectScores: Record<string, { correct: number; total: number }> = {};
+      const topicScores: Record<string, { correct: number; total: number }> = {};
 
       evaluationResult.results.forEach((result) => {
         const subject = result.subject.toLowerCase();
+        const topic = result.topic.toLowerCase();
+
+        // Track subject scores
         if (!subjectScores[subject]) {
           subjectScores[subject] = { correct: 0, total: 0 };
         }
         subjectScores[subject].total++;
         if (result.is_correct) {
           subjectScores[subject].correct++;
+        }
+
+        // Track topic scores for fallback strength/weakness calculation
+        if (!topicScores[topic]) {
+          topicScores[topic] = { correct: 0, total: 0 };
+        }
+        topicScores[topic].total++;
+        if (result.is_correct) {
+          topicScores[topic].correct++;
         }
       });
 
@@ -594,11 +607,27 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
         percentage: (scores.correct / scores.total) * 100,
       }));
 
+      // Use backend strong_topics, or calculate from topic scores if empty (70% threshold like Android)
+      let strengths = evaluationResult.strong_topics;
+      let weaknesses = evaluationResult.weak_topics;
+
+      if (strengths.length === 0) {
+        strengths = Object.entries(topicScores)
+          .filter(([, scores]) => (scores.correct / scores.total) >= 0.7)
+          .map(([topic]) => topic);
+      }
+
+      if (weaknesses.length === 0) {
+        weaknesses = Object.entries(topicScores)
+          .filter(([, scores]) => (scores.correct / scores.total) < 0.5)
+          .map(([topic]) => topic);
+      }
+
       return {
         score: evaluationResult.correct_answers,
         total: evaluationResult.total_questions,
-        strengths: evaluationResult.strong_topics,
-        weaknesses: evaluationResult.weak_topics,
+        strengths,
+        weaknesses,
         subjectScores: subjectScoresArray,
         xpEarned: 100 + evaluationResult.correct_answers * 10,
         level:
