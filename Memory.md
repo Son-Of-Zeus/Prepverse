@@ -1097,4 +1097,62 @@ Implemented peer mentoring feature for study collaboration between classmates.
 
 ---
 
+### 2024-12-28 - Discussion Forum Implementation (Android)
+
+Implemented complete discussion forum feature for the Android app with Reddit-style post/comment/vote functionality.
+
+**New Android Files Created**:
+
+| File | Purpose |
+|------|---------|
+| `data/remote/api/dto/ForumDtos.kt` | Forum DTOs (CreatePostRequest, CreateCommentRequest, VoteRequest, ForumPostResponse, etc.) |
+| `data/repository/ForumRepository.kt` | Forum API calls with DTO-to-domain mapping |
+| `domain/model/Forum.kt` | Domain models (ForumPost, ForumPostDetail, ForumComment, VoteType, ForumCategory) |
+| `ui/screens/forum/ForumListScreen.kt` | Forum post list with search, category filters, pagination |
+| `ui/screens/forum/ForumListViewModel.kt` | Post listing state management with debounced search |
+| `ui/screens/forum/PostDetailScreen.kt` | Post detail view with comments, nested replies, voting |
+| `ui/screens/forum/PostDetailViewModel.kt` | Post detail state, voting, commenting |
+| `ui/screens/forum/CreatePostScreen.kt` | Create new post form with category, tags |
+| `ui/screens/forum/CreatePostViewModel.kt` | Post creation state |
+
+**Updated Files**:
+
+| File | Changes |
+|------|---------|
+| `data/remote/api/PrepVerseApi.kt` | Added 7 forum endpoints |
+| `ui/navigation/Routes.kt` | Added Forum, ForumPost, CreatePost routes |
+| `ui/navigation/NavGraph.kt` | Wired forum navigation |
+| `ui/screens/dashboard/DashboardScreen.kt` | Added Forum quick action button |
+
+**API Endpoints** (in PrepVerseApi.kt):
+- `GET /api/v1/forum/` - List posts with pagination, category filter, search
+- `POST /api/v1/forum/` - Create new post
+- `GET /api/v1/forum/{postId}` - Get post details with comments
+- `DELETE /api/v1/forum/{postId}` - Delete post (owner only)
+- `POST /api/v1/forum/{postId}/comments` - Add comment
+- `POST /api/v1/forum/{postId}/vote` - Vote on post
+- `POST /api/v1/forum/comments/{commentId}/vote` - Vote on comment
+
+**Forum Categories** (ForumCategory enum):
+- General, Mathematics, Physics, Chemistry, Biology
+- Exam Tips, Study Groups, Resources
+
+**Features Implemented**:
+- Post listing with infinite scroll pagination
+- Category filtering (subject-based)
+- Full-text search with debounce (300ms)
+- Post creation with title, content, category, tags (up to 5)
+- Nested comments/replies (up to 2 levels deep)
+- Upvote/downvote on posts and comments
+- View count tracking
+- Pinned posts support
+- Post deletion (owner only)
+- Time-ago formatting for timestamps
+- Color-coded categories matching subject colors
+
+**Navigation Flow**:
+Dashboard → Forum List → Post Detail (with comments) → Create Post (FAB)
+
+---
+
 *Last Updated: 2024-12-28*

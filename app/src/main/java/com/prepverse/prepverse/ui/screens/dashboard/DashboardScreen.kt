@@ -35,6 +35,7 @@ fun DashboardScreen(
     onNavigateToFocus: () -> Unit,
     onNavigateToProgress: () -> Unit,
     onNavigateToPeer: () -> Unit,
+    onNavigateToForum: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -197,6 +198,23 @@ fun DashboardScreen(
                                 color = PlasmaPurple,
                                 onClick = onNavigateToPeer
                             )
+                        }
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            QuickActionCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Forum",
+                                icon = Icons.Default.Forum,
+                                color = ElectricCyan,
+                                onClick = onNavigateToForum
+                            )
+                            // Empty spacer to maintain layout balance
+                            Box(modifier = Modifier.weight(1f))
                         }
                     }
 

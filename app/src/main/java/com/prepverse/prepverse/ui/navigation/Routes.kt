@@ -29,4 +29,11 @@ sealed class Routes(val route: String) {
     data object Battle : Routes("battle/{battleId}") {
         fun createRoute(battleId: String) = "battle/$battleId"
     }
+
+    // Forum routes
+    data object Forum : Routes("forum")
+    data object ForumPost : Routes("forum/post/{postId}") {
+        fun createRoute(postId: String) = "forum/post/$postId"
+    }
+    data object CreatePost : Routes("forum/create")
 }
