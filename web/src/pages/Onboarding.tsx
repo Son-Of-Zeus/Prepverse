@@ -260,6 +260,11 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       const result = await submitOnboardingAnswers(submissionAnswers);
       setEvaluationResult(result);
       setStep('results');
+      
+      // Exit fullscreen when showing results
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(err => console.warn("Failed to exit fullscreen:", err));
+      }
     } catch (err) {
       console.error('Failed to submit answers:', err);
       setError('Failed to submit answers. Please try again.');
