@@ -5,16 +5,17 @@ import axios, { AxiosInstance } from 'axios';
  *
  * Axios instance configured with:
  * - Base URL from environment variables
- * - Credentials included for cookie-based authentication
+ * - Bearer token authentication
  * - Error handling interceptor
  */
 
 // API URL - empty means use relative path (Vite proxy in dev)
 const apiUrl = import.meta.env.VITE_API_URL || '';
 
+const TOKEN_KEY = 'prepverse_token';
+
 /**
  * Create axios instance with base configuration
- * withCredentials: true ensures cookies are sent with cross-origin requests
  */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: `${apiUrl}/api/v1`,
@@ -22,8 +23,21 @@ export const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000, // 30 second timeout
-  withCredentials: true, // Include cookies in requests
 });
+
+/**
+ * Request interceptor to add Bearer token
+ */
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
 /**
  * Response interceptor

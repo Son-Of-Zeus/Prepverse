@@ -1,6 +1,29 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api/client';
 
+const TOKEN_KEY = 'prepverse_token';
+
+/**
+ * Get stored auth token
+ */
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem(TOKEN_KEY);
+};
+
+/**
+ * Set auth token
+ */
+export const setAuthToken = (token: string): void => {
+  localStorage.setItem(TOKEN_KEY, token);
+};
+
+/**
+ * Clear auth token
+ */
+export const clearAuthToken = (): void => {
+  localStorage.removeItem(TOKEN_KEY);
+};
+
 /**
  * User profile returned from the backend
  */
@@ -28,8 +51,8 @@ interface AuthState {
 /**
  * Custom Auth Hook
  *
- * Uses server-side OAuth with HTTP-only cookies.
- * No client-side token management required.
+ * Uses token-based auth for cross-origin compatibility.
+ * Token is stored in localStorage and sent as Bearer token.
  */
 export const useAuth = () => {
   const [state, setState] = useState<AuthState>({
@@ -40,10 +63,39 @@ export const useAuth = () => {
   });
 
   /**
+   * Check for token in URL (after OAuth callback)
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    if (token) {
+      setAuthToken(token);
+      // Clean the URL
+      params.delete('token');
+      const newUrl = params.toString()
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
+
+  /**
    * Check authentication status by calling /auth/me
-   * Cookie is automatically sent by the browser
+   * Token is sent as Bearer header via interceptor
    */
   const checkAuth = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
     try {
       const response = await apiClient.get('/auth/me');
       setState({
@@ -53,7 +105,8 @@ export const useAuth = () => {
         error: null,
       });
     } catch (error) {
-      // 401 is expected when not logged in
+      // Token invalid or expired
+      clearAuthToken();
       setState({
         user: null,
         isAuthenticated: false,
@@ -63,9 +116,12 @@ export const useAuth = () => {
     }
   }, []);
 
-  // Check auth on mount
+  // Check auth on mount (with small delay to allow token capture from URL)
   useEffect(() => {
-    checkAuth();
+    const timer = setTimeout(() => {
+      checkAuth();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [checkAuth]);
 
   /**
@@ -80,22 +136,17 @@ export const useAuth = () => {
 
   /**
    * Log out the current user
-   * Calls backend to clear session cookie
+   * Clears local token
    */
   const logout = useCallback(async () => {
-    try {
-      await apiClient.post('/auth/logout');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      });
-      window.location.href = '/';
-    }
+    clearAuthToken();
+    setState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    });
+    window.location.href = '/';
   }, []);
 
   return {
