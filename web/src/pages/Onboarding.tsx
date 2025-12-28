@@ -7,6 +7,7 @@ import { AssessmentTimer } from '../components/onboarding/AssessmentTimer';
 import { ProgressIndicator, QuestionDots } from '../components/onboarding/ProgressIndicator';
 import { ResultsScreen } from '../components/onboarding/ResultsScreen';
 import { FocusViolationModal } from '../components/focus/FocusViolationModal';
+import { ProctoringInstructionsModal } from '../components/onboarding/ProctoringInstructionsModal';
 
 // Backend API imports (from main)
 import {
@@ -117,6 +118,8 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
   // Proctoring state
   const [violations, setViolations] = useState(0);
   const [showViolationModal, setShowViolationModal] = useState(false);
+  const [showProctoringInstructions, setShowProctoringInstructions] = useState(false);
+  const [terminationMessage, setTerminationMessage] = useState<string | null>(null);
   const maxViolations = 3;
 
   // Refs for tracking (from sanghu)
@@ -153,6 +156,15 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     };
   }, []);
 
+  // Check for previous violation on mount
+  useEffect(() => {
+    const violationMsg = sessionStorage.getItem('proctoring_violation_msg');
+    if (violationMsg) {
+      setTerminationMessage(violationMsg);
+      sessionStorage.removeItem('proctoring_violation_msg');
+    }
+  }, []);
+
   const handleWelcomeContinue = () => {
     setStep('class-select');
   };
@@ -169,9 +181,27 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
     setSelectedSchool(school);
   };
 
-  // Combined handleStartAssessment: fetches from backend AND initializes focus tracking
-  const handleStartAssessment = async () => {
+  // Combined handleStartAssessment: Shows proctoring instructions first
+  const handleStartAssessment = () => {
     if (!selectedClass) return;
+    setShowProctoringInstructions(true);
+  };
+
+  // Actual start after instructions accepted
+  const handleConfirmStart = async () => {
+    setShowProctoringInstructions(false);
+
+    // Request Fullscreen
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (err) {
+      console.warn('Fullscreen request denied:', err);
+      // We can continue, but maybe we should warn? 
+      // User requirement says "Strict Full-Screen Enforcement", but browsers might block it.
+      // Usually it works on user interaction (like button click).
+    }
 
     setStep('loading');
     setError(null);
@@ -186,11 +216,9 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       }
     }
 
-
-
     try {
       // Fetch questions from backend (from main)
-      const fetchedQuestions = await getOnboardingQuestions(selectedClass);
+      const fetchedQuestions = await getOnboardingQuestions(selectedClass!);
       setBackendQuestions(fetchedQuestions);
       setQuestions(convertToQuestionCardFormat(fetchedQuestions));
       setStep('quiz');
@@ -232,6 +260,11 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       const result = await submitOnboardingAnswers(submissionAnswers);
       setEvaluationResult(result);
       setStep('results');
+      
+      // Exit fullscreen when showing results
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(err => console.warn("Failed to exit fullscreen:", err));
+      }
     } catch (err) {
       console.error('Failed to submit answers:', err);
       setError('Failed to submit answers. Please try again.');
@@ -293,17 +326,19 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
   };
 
   const handleEndSessionFromViolation = () => {
-    // Terminated due to violations - don't save any stats, restart onboarding
+    // Terminated due to violations
     setShowViolationModal(false);
-    setStep('class-select');
-    setCurrentQuestion(1);
-    setAnswers({});
-    setViolations(0);
-    setQuestions([]);
-    setBackendQuestions([]);
-    // Don't reset selectedSchool or selectedClass to allow quick restart? 
-    // Actually, usually it resets everything. Let's keep class selected maybe.
-    // User logic: setStep('class-select') means they have to click Continue again.
+
+    // Exit Fullscreen first
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(err => console.warn("Failed to exit fullscreen:", err));
+    }
+
+    // Persist message to session storage so it survives reload
+    sessionStorage.setItem('proctoring_violation_msg', "Session terminated due to multiple focus violations. Please restart in a focused environment.");
+
+    // Force a complete page reload to ensure 100% clean state
+    window.location.reload();
   };
 
   // Session tracking: Update actual duration periodically (from sanghu)
@@ -439,18 +474,53 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
       e.preventDefault();
     };
 
+    // Fullscreen change handler
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        // User exited fullscreen
+        setViolations((prev) => {
+          const newCount = prev + 1;
+          if (newCount >= maxViolations) {
+            handleEndSessionFromViolation();
+            return newCount; // State update might not happen immediately before unmount, but logic handled.
+          }
+          setShowViolationModal(true);
+          return newCount;
+        });
+
+        // Also track as interruption
+        if (!interruptionStartRef.current) {
+          const now = Date.now();
+          interruptionStartRef.current = now;
+          setSessionTracking((prev) => ({
+            ...prev,
+            interruptions: [
+              ...prev.interruptions,
+              {
+                type: 'visibility_change', // Treat fullscreen exit as visibility change/focus loss
+                timestamp: now,
+              },
+            ],
+            lastInterruptionStart: now,
+          }));
+        }
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
     document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [step]);
+  }, [step]); // Re-bind when step changes (specifically to 'quiz')
 
   // Store session data to localStorage (from sanghu)
   useEffect(() => {
@@ -592,8 +662,19 @@ export const OnboardingPage: React.FC<OnboardingPageProps> = ({ onComplete }) =>
 
       {/* Content */}
       <div className="relative z-10">
+        {/* Proctoring Instructions Modal */}
+        {showProctoringInstructions && (
+          <ProctoringInstructionsModal
+            onConfirm={handleConfirmStart}
+            onCancel={() => setShowProctoringInstructions(false)}
+          />
+        )}
         {step === 'welcome' && (
-          <WelcomeScreen userName={userName} onContinue={handleWelcomeContinue} />
+          <WelcomeScreen
+            userName={userName}
+            onContinue={handleWelcomeContinue}
+            alertMessage={terminationMessage}
+          />
         )}
 
         {step === 'class-select' && (
