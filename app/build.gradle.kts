@@ -45,6 +45,11 @@ android {
             // Your computer's local IP for physical device testing
             buildConfigField("String", "API_BASE_URL", "\"http://172.31.98.79:8000\"")
         }
+        create("production") {
+            dimension = "device"
+            // Production Railway backend URL
+            buildConfigField("String", "API_BASE_URL", "\"https://prepverse-production.up.railway.app\"")
+        }
     }
 
     buildTypes {
