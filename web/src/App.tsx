@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, PracticeSelectionPage, PeerLobby, StudyRoom } from './pages';
+import { LoginPage, OnboardingPage, DashboardPage, PracticePage, PracticeSession, PracticeResults, FocusModePage, PracticeSelectionPage, PeerLobby, StudyRoom, GuruMode, GuruHistory } from './pages';
 import { DiscussionFeed } from './pages/DiscussionFeed';
 import { DiscussionThread } from './pages/DiscussionThread';
 import { useAuth } from './hooks/useAuth';
@@ -171,6 +171,24 @@ function AppContent() {
           element={
             isAuthenticated
               ? (user?.onboarding_completed ? <DiscussionThread /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+
+        {/* Guru Mode Routes */}
+        <Route
+          path="/guru"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <GuruMode /> : <Navigate to="/onboarding" />)
+              : <Navigate to="/login" />
+          }
+        />
+        <Route
+          path="/guru/history"
+          element={
+            isAuthenticated
+              ? (user?.onboarding_completed ? <GuruHistory /> : <Navigate to="/onboarding" />)
               : <Navigate to="/login" />
           }
         />

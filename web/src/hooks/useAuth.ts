@@ -14,6 +14,7 @@ export interface User {
   total_questions_attempted: number;
   correct_answers: number;
   accuracy: number;
+  xp?: number;
   created_at: string;
 }
 

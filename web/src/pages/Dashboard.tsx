@@ -9,7 +9,7 @@ import { SWOTAnalysis } from '../components/dashboard/SWOTAnalysis';
 import {
   LayoutDashboard, Target, Zap, Users,
   LogOut, Flame, Star, BookOpen,
-  ArrowRight, Trophy, Activity, MessageSquare
+  ArrowRight, Trophy, Activity, MessageSquare, GraduationCap
 } from 'lucide-react';
 import { forumApi } from '../api/forum';
 
@@ -23,6 +23,7 @@ const SideNav = () => {
   const navItems: Array<{ label: string; icon: typeof LayoutDashboard; path: string; disabled?: boolean }> = [
     { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Start Practice', icon: Target, path: '/practice' },
+    { label: 'Guru Mode', icon: GraduationCap, path: '/guru' },
     { label: 'Discussion', icon: MessageSquare, path: '/discussion' },
     { label: 'Focus Mode', icon: Zap, path: '/focus' },
     { label: 'Peer Study', icon: Users, path: '/peer' },
