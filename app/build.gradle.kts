@@ -37,13 +37,13 @@ android {
     productFlavors {
         create("emulator") {
             dimension = "device"
-            // 10.0.2.2 maps to host localhost from Android emulator
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000\"")
+            // Production backend URL
+            buildConfigField("String", "API_BASE_URL", "\"https://prepverse-production.up.railway.app\"")
         }
         create("physical") {
             dimension = "device"
-            // Your computer's local IP for physical device testing
-            buildConfigField("String", "API_BASE_URL", "\"http://172.31.98.79:8000\"")
+            // Production backend URL
+            buildConfigField("String", "API_BASE_URL", "\"https://prepverse-production.up.railway.app\"")
         }
     }
 
