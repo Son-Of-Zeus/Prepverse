@@ -21,7 +21,7 @@
 
 ---
 
-## 🧠 GURU AI Mode
+## GURU AI Mode
 
 <p align="center">
   <img src="https://img.shields.io/badge/Powered%20By-Google%20Gemini%20Flash%203-4285F4?style=for-the-badge&logo=google" alt="Gemini Flash 3" />
@@ -30,12 +30,6 @@
 > *"If you can't explain it simply, you don't understand it well enough."* — Richard Feynman
 
 **GURU Mode** is PrepVerse's breakthrough AI tutoring system that flips traditional learning on its head. Instead of passively absorbing information, students **teach concepts to an AI student** — proving mastery through explanation.
-
-<p align="center">
-  <img src="assets/guru-mode-demo.jpeg" alt="GURU AI Mode Demo - Teaching Modern Physics" width="800" />
-  <br/>
-  <em>Teaching "Dual Nature" in Modern Physics to an AI peer student</em>
-</p>
 
 ### How It Works
 
@@ -46,10 +40,10 @@
 │                                                                  │
 │   1. SELECT TOPIC         →   "Quadratic Equations"             │
 │                                                                  │
-│   2. CHOOSE AI PERSONA    →   🧒 5-Year-Old                     │
-│                               👥 Peer (Classmate)               │
-│                               🤔 Skeptic                         │
-│                               💡 Curious Beginner               │
+│   2. CHOOSE AI PERSONA    →    5-Year-Old                     │
+│                                Peer (Classmate)               │
+│                                Skeptic                         │
+│                                Curious Beginner               │
 │                                                                  │
 │   3. TEACH THE AI         →   Explain in your own words         │
 │                                                                  │
@@ -79,10 +73,10 @@ Each persona creates a unique teaching challenge:
 
 | Persona | Behavior | Challenge |
 |---------|----------|-----------|
-| 🧒 **5-Year-Old** | No technical terms allowed | Requires analogies and simple language |
-| 👥 **Peer** | Missed the lesson, needs catching up | Must explain key concepts quickly |
-| 🤔 **Skeptic** | Questions everything, asks for proof | Requires evidence and logical reasoning |
-| 💡 **Curious Beginner** | Excited to learn, asks follow-ups | Must handle tangential questions |
+| **5-Year-Old** | No technical terms allowed | Requires analogies and simple language |
+| **Peer** | Missed the lesson, needs catching up | Must explain key concepts quickly |
+| **Skeptic** | Questions everything, asks for proof | Requires evidence and logical reasoning |
+| **Curious Beginner** | Excited to learn, asks follow-ups | Must handle tangential questions |
 
 ### Real-Time Feedback
 
@@ -102,60 +96,51 @@ Maximum XP: 90 (perfect 10/10 on both scores)
 
 ---
 
-## ✨ Features
+## Features
 
-### 📚 Adaptive Practice
+### Adaptive Practice
 - **AI-Generated Questions**: Fresh questions powered by Gemini, tailored to your level
 - **Concept-Based Difficulty**: Questions adapt based on per-topic mastery scores
 - **Instant Feedback**: Explanations for every answer
 - **Topic Selection**: Full CBSE curriculum for Math, Physics, Chemistry, Biology
 
-### 🎯 Focus Mode
+### Focus Mode
 - **Pomodoro Timer**: Configurable work/break sessions (5-120 min)
 - **App Blocking** (Android): Accessibility service detects when you leave the app
 - **Do Not Disturb**: Automatic DND activation during sessions
 - **Violation Tracking**: 3 violations = session terminated
 - **Statistics**: Track focus time, interruptions, and streaks
 
-### 📊 Progress Dashboard
+### Progress Dashboard
 - **Real-Time Analytics**: Track accuracy, attempts, and time spent
 - **Concept Mastery**: Per-topic score breakdown (0-100%)
 - **Strength/Weakness Analysis**: AI-identified areas to focus on
 - **Trends & Charts**: Visualize progress over time
 
-### 👥 Peer Collaboration
+### Peer Collaboration
 - **Study Rooms**: Create rooms for 2-4 students (same school/class only)
 - **Real-Time Chat**: End-to-end encrypted messaging (AES-256-CBC)
 - **Collaborative Whiteboard**: Draw and explain concepts together
 - **Voice Calls**: WebRTC-based peer-to-peer voice chat
 - **Peer Discovery**: Find classmates studying the same topic
 
-### ⚔️ Study Battles
-- **1v1 Competitions**: Race to answer questions correctly
-- **Timed Rounds**: 10 questions in 5 minutes
-- **XP Stakes**: Winner earns 75 XP
-- **Leaderboards**: Compete within your school
 
-### 💬 Discussion Forum
+### Discussion Forum
 - **Subject-Based Categories**: Math, Physics, Chemistry, Biology, Exam Tips
 - **Nested Comments**: Reddit-style threaded discussions
 - **Voting System**: Upvote helpful posts and answers
 - **Search & Filter**: Find relevant discussions quickly
 
-### 🏆 Gamification
+### Gamification
 - **XP System**: Earn points for every action
 - **Levels & Badges**: Progress from Beginner to PrepVerse Pro
 - **Daily Streaks**: Bonus XP for consistency
 - **School Leaderboards**: Compete with classmates
 
-### 📱 Offline Support
-- **Question Cache**: Practice without internet
-- **Auto-Sync**: WorkManager (Android) / Service Worker (Web)
-- **Progress Saved Locally**: Never lose your work
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Mobile (Android)
 | Technology | Purpose |
@@ -167,7 +152,6 @@ Maximum XP: 90 (perfect 10/10 on both scores)
 | **DataStore** | Preferences storage |
 | **Retrofit + OkHttp** | API client |
 | **WebRTC** | Voice calls |
-| **WorkManager** | Background sync |
 
 ### Web (PWA)
 | Technology | Purpose |
@@ -178,7 +162,6 @@ Maximum XP: 90 (perfect 10/10 on both scores)
 | **TailwindCSS** | Styling |
 | **Zustand** | State management |
 | **Dexie.js** | IndexedDB wrapper |
-| **Service Worker** | Offline support |
 
 ### Backend
 | Technology | Purpose |
@@ -192,7 +175,7 @@ Maximum XP: 90 (perfect 10/10 on both scores)
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -262,7 +245,7 @@ npm run dev
 
 ---
 
-## 📐 Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -323,7 +306,7 @@ See `backend/app/core/security.py` for the unified authentication handler.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 prepverse/
@@ -373,7 +356,7 @@ prepverse/
 
 ---
 
-## 📚 API Reference
+## API Reference
 
 Base URL: `http://localhost:8000/api/v1`
 
@@ -405,7 +388,7 @@ Interactive API docs: `http://localhost:8000/docs`
 
 ---
 
-## 🔒 Security
+## Security
 
 - **Authentication**: Auth0 with Google OAuth only
 - **Session Management**: HTTP-only cookies (web), encrypted storage (Android)
@@ -415,7 +398,7 @@ Interactive API docs: `http://localhost:8000/docs`
 
 ---
 
-## 🎯 Target Users
+## Target Users
 
 - **CBSE Class 10 & 12 Students**
 - **Subjects**: Mathematics, Physics, Chemistry, Biology
@@ -423,13 +406,13 @@ Interactive API docs: `http://localhost:8000/docs`
 
 ---
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Google Gemini](https://ai.google.dev/) for powering GURU AI Mode
 - [Auth0](https://auth0.com/) for authentication
