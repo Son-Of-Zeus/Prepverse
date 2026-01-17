@@ -27,6 +27,10 @@
   <img src="https://img.shields.io/badge/Powered%20By-Google%20Gemini%20Flash%203-4285F4?style=for-the-badge&logo=google" alt="Gemini Flash 3" />
 </p>
 
+<p align="center">
+  <img src="assets/guru-mode-demo.jpeg" alt="GURU AI Mode Demo" width="800" />
+</p>
+
 > *"If you can't explain it simply, you don't understand it well enough."* — Richard Feynman
 
 **GURU Mode** is PrepVerse's breakthrough AI tutoring system that flips traditional learning on its head. Instead of passively absorbing information, students **teach concepts to an AI student** — proving mastery through explanation.
