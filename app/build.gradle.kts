@@ -88,6 +88,13 @@ android {
         compose = true
         buildConfig = true
     }
+
+    packaging {
+        jniLibs {
+            // Disable native library stripping (workaround for NDK tool execution issues)
+            keepDebugSymbols += "**/*.so"
+        }
+    }
 }
 
 dependencies {

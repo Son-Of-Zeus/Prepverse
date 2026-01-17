@@ -19,3 +19,6 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# SLF4J binding not needed at runtime (used by Ktor/Supabase)
+-dontwarn org.slf4j.impl.StaticLoggerBinder
