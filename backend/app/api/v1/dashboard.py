@@ -76,7 +76,7 @@ async def get_dashboard(
         
         # Get streak and XP info
         streak_info = _calculate_streak_info(db, db_user_id)
-        daily_xp = _calculate_daily_xp(attempts)
+        daily_xp = _calculate_daily_xp(db, db_user_id)
         
         return DashboardResponse(
             performance_summary=PerformanceSummary(
@@ -209,47 +209,74 @@ def _get_suggested_topics(db: Client, user_id: str, attempts: List[dict]) -> Lis
 
 
 def _calculate_streak_info(db: Client, user_id: str) -> StreakInfo:
-    """Calculate user's streak information"""
-    # Get study sessions or attempts to determine streak
-    # For now, use a simple calculation based on recent activity
-    attempts_result = (
-        db.table("user_attempts")
-        .select("created_at")
-        .eq("user_id", user_id)
-        .order("created_at", desc=True)
-        .limit(30)
-        .execute()
-    )
-    
-    attempts = attempts_result.data if attempts_result.data else []
-    
-    # Calculate current streak (consecutive days with activity)
-    current_streak = 0
-    longest_streak = 0
+    """Calculate user's streak information from all activity sources"""
     dates_with_activity = set()
-    
-    for attempt in attempts:
-        created_at = attempt.get("created_at")
-        if created_at:
-            try:
-                if isinstance(created_at, str):
-                    date_str = created_at.split("T")[0] if "T" in created_at else created_at.split(" ")[0]
-                else:
-                    date_str = str(created_at).split("T")[0] if "T" in str(created_at) else str(created_at).split(" ")[0]
-                dates_with_activity.add(date_str)
-            except Exception:
-                continue
-    
+
+    def _extract_dates(rows: list, date_field: str):
+        for row in rows:
+            val = row.get(date_field)
+            if val:
+                try:
+                    date_str = str(val).split("T")[0] if "T" in str(val) else str(val).split(" ")[0]
+                    dates_with_activity.add(date_str)
+                except Exception:
+                    continue
+
+    # Collect activity dates from all sources
+    # 1. Practice sessions
+    try:
+        practice_result = (
+            db.table("practice_sessions")
+            .select("started_at")
+            .eq("user_id", user_id)
+            .order("started_at", desc=True)
+            .limit(100)
+            .execute()
+        )
+        _extract_dates(practice_result.data or [], "started_at")
+    except Exception:
+        pass
+
+    # 2. Guru sessions
+    try:
+        guru_result = (
+            db.table("guru_sessions")
+            .select("created_at")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(100)
+            .execute()
+        )
+        _extract_dates(guru_result.data or [], "created_at")
+    except Exception:
+        pass
+
+    # 3. Onboarding attempts (user_attempts)
+    try:
+        attempts_result = (
+            db.table("user_attempts")
+            .select("created_at")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(30)
+            .execute()
+        )
+        _extract_dates(attempts_result.data or [], "created_at")
+    except Exception:
+        pass
+
     # Calculate current streak (consecutive days from today)
+    current_streak = 0
     today = datetime.now().date()
-    for i in range(30):
+    for i in range(365):
         check_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
         if check_date in dates_with_activity:
             current_streak += 1
         else:
             break
 
-    # Calculate longest streak (scan all dates for longest consecutive run)
+    # Calculate longest streak
+    longest_streak = 0
     if dates_with_activity:
         sorted_dates = sorted(dates_with_activity)
         temp_streak = 1
@@ -262,13 +289,11 @@ def _calculate_streak_info(db: Client, user_id: str) -> StreakInfo:
             else:
                 temp_streak = 1
         longest_streak = max(longest_streak, temp_streak, current_streak)
-    
-    # Calculate total XP (10 XP per correct answer, 5 per attempt)
-    total_xp = sum(
-        10 if a.get("is_correct", False) else 5
-        for a in attempts
-    )
-    
+
+    # Read stored XP from users table
+    user_result = db.table("users").select("xp").eq("id", user_id).execute()
+    total_xp = user_result.data[0].get("xp", 0) or 0 if user_result.data else 0
+
     return StreakInfo(
         current_streak=current_streak,
         longest_streak=longest_streak,
@@ -276,29 +301,41 @@ def _calculate_streak_info(db: Client, user_id: str) -> StreakInfo:
     )
 
 
-def _calculate_daily_xp(attempts: List[dict]) -> int:
-    """Calculate XP earned today"""
-    today = datetime.now().date().strftime("%Y-%m-%d")
-    
-    today_attempts = []
-    for a in attempts:
-        created_at = a.get("created_at", "")
-        if not created_at:
-            continue
-        try:
-            # Parse date
-            if isinstance(created_at, str):
-                date_str = created_at.split("T")[0] if "T" in created_at else created_at.split(" ")[0]
-            else:
-                date_str = str(created_at).split("T")[0] if "T" in str(created_at) else str(created_at).split(" ")[0]
-            
-            if date_str == today:
-                today_attempts.append(a)
-        except Exception:
-            continue
-    
-    return sum(
-        10 if a.get("is_correct", False) else 5
-        for a in today_attempts
-    )
+def _calculate_daily_xp(db: Client, user_id: str) -> int:
+    """Calculate XP earned today from practice sessions and guru sessions"""
+    today_start = datetime.now().date().isoformat()
+
+    daily_xp = 0
+
+    # Practice sessions completed today: stored xp_earned
+    try:
+        practice_result = (
+            db.table("practice_sessions")
+            .select("xp_earned")
+            .eq("user_id", user_id)
+            .eq("status", "completed")
+            .gte("ended_at", today_start)
+            .execute()
+        )
+        for session in practice_result.data or []:
+            daily_xp += session.get("xp_earned", 0) or 0
+    except Exception:
+        pass
+
+    # Guru sessions completed today: stored xp_earned
+    try:
+        guru_result = (
+            db.table("guru_sessions")
+            .select("xp_earned")
+            .eq("user_id", user_id)
+            .eq("status", "completed")
+            .gte("updated_at", today_start)
+            .execute()
+        )
+        for session in guru_result.data or []:
+            daily_xp += session.get("xp_earned", 0) or 0
+    except Exception:
+        pass
+
+    return daily_xp
 

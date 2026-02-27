@@ -389,6 +389,8 @@ class PracticeService:
 
         # Update session record
         score_pct = (correct / total * 100) if total > 0 else 0
+        xp_earned = correct * 10
+
         self.db.table("practice_sessions").update(
             {
                 "status": (
@@ -404,8 +406,21 @@ class PracticeService:
                 "total_time_seconds": total_time,
                 "avg_time_per_question": avg_time,
                 "score_percentage": score_pct,
+                "xp_earned": xp_earned if not abandoned else 0,
             }
         ).eq("id", session_id).execute()
+
+        # Persist XP to user's total (only for completed sessions, not abandoned)
+        if not abandoned and xp_earned > 0:
+            try:
+                user_result = self.db.table("users").select("xp").eq("id", user_id).execute()
+                if user_result.data:
+                    current_xp = user_result.data[0].get("xp", 0) or 0
+                    self.db.table("users").update({
+                        "xp": current_xp + xp_earned
+                    }).eq("id", user_id).execute()
+            except Exception as e:
+                print(f"Warning: Could not update user XP: {e}")
 
         # Build review list
         reviews = []
