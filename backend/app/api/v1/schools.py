@@ -164,35 +164,19 @@ async def search_schools(
     ---
     """
     try:
-        # Build query - search by name only (case-insensitive contains)
-        # Fetch more results to account for duplicates we'll filter out
-        query_builder = db.table("schools").select(
-            "id, affiliation_code, name, state, district, address"
-        )
-
-        # Apply state filter if provided
+        # Use the search_schools RPC function which leverages GIN indexes
+        # and trigram similarity for ranked results
+        rpc_params = {
+            "search_query": q,
+            "result_limit": limit,
+        }
         if state:
-            query_builder = query_builder.eq("state", state)
+            rpc_params["state_filter"] = state
 
-        # Search by name only (case-insensitive contains)
-        query_builder = query_builder.ilike("name", f"%{q}%")
+        result = db.rpc("search_schools", rpc_params).execute()
 
-        # Order by name and fetch extra results to handle duplicates
-        query_builder = query_builder.order("name").limit(limit * 3)
-
-        result = query_builder.execute()
-
-        # Format results with display names, removing duplicates by name
-        schools = []
-        seen_names = set()
-        for school in result.data:
-            # Skip duplicates (same name)
-            name_lower = school["name"].lower().strip()
-            if name_lower in seen_names:
-                continue
-            seen_names.add(name_lower)
-
-            schools.append(SchoolSearchResult(
+        schools = [
+            SchoolSearchResult(
                 id=school["id"],
                 affiliation_code=school["affiliation_code"],
                 name=school["name"],
@@ -204,11 +188,9 @@ async def search_schools(
                     school.get("district"),
                     school.get("state")
                 )
-            ))
-
-            # Stop once we have enough unique results
-            if len(schools) >= limit:
-                break
+            )
+            for school in (result.data or [])
+        ]
 
         return SchoolSearchResponse(
             results=schools,

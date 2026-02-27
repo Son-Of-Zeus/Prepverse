@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useDebounce } from '../../hooks/useDebounce';
-import { searchSchools, type School } from '../../api/schools';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useDebouncedSearch } from '../../hooks/useDebounce';
+import { searchSchools, type School, type SchoolSearchResponse } from '../../api/schools';
 
 interface SchoolSelectorProps {
   value: string | null;
@@ -13,11 +13,8 @@ interface SchoolSelectorProps {
 /**
  * SchoolSelector - Autocomplete search component for school selection
  *
- * Design Philosophy:
- * - Clean, minimal search interface matching PrepVerse aesthetic
- * - Debounced search to prevent API spam (300ms delay)
- * - Dropdown with school details (name, district, state)
- * - Loading and empty states handled gracefully
+ * Uses debounced search with AbortController to prevent race conditions
+ * and cancel stale requests when the user types quickly.
  */
 export const SchoolSelector: React.FC<SchoolSelectorProps> = ({
   value,
@@ -26,37 +23,41 @@ export const SchoolSelector: React.FC<SchoolSelectorProps> = ({
   disabled = false,
   error,
 }) => {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<School[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Debounce search query to prevent excessive API calls
-  const debouncedQuery = useDebounce(query, 300);
+  // Stable fetch function — AbortSignal is passed through to axios
+  const fetchSchools = useCallback(
+    (q: string, signal: AbortSignal) => searchSchools(q, undefined, 20, signal),
+    []
+  );
 
-  // Fetch results when debounced query changes
+  const {
+    query,
+    setQuery,
+    results: searchData,
+    isLoading,
+    reset,
+  } = useDebouncedSearch<SchoolSearchResponse>(fetchSchools, 300, 2);
+
+  const results = searchData?.results ?? [];
+
+  // Open dropdown when results arrive
   useEffect(() => {
-    if (debouncedQuery.length >= 2) {
-      setIsLoading(true);
-      searchSchools(debouncedQuery)
-        .then((data) => {
-          setResults(data.results);
-          setIsOpen(true);
-        })
-        .catch((err) => {
-          console.error('School search failed:', err);
-          setResults([]);
-        })
-        .finally(() => setIsLoading(false));
-    } else {
-      setResults([]);
+    if (results.length > 0 && !selectedSchool) {
+      setIsOpen(true);
+    }
+  }, [results, selectedSchool]);
+
+  // Close dropdown when query is too short
+  useEffect(() => {
+    if (query.length < 2) {
       setIsOpen(false);
     }
-  }, [debouncedQuery]);
+  }, [query]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -73,7 +74,6 @@ export const SchoolSelector: React.FC<SchoolSelectorProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle school selection
   const handleSelect = (school: School) => {
     setSelectedSchool(school);
     setQuery(school.name);
@@ -81,11 +81,9 @@ export const SchoolSelector: React.FC<SchoolSelectorProps> = ({
     onChange(school.id, school);
   };
 
-  // Clear selection
   const handleClear = () => {
     setSelectedSchool(null);
-    setQuery('');
-    setResults([]);
+    reset();
     onChange(null, null);
     inputRef.current?.focus();
   };

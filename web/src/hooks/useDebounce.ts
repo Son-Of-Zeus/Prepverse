@@ -1,38 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * useDebounce - Debounces a value by the specified delay
  *
- * Use this hook to delay API calls or expensive operations until the user
- * stops typing/changing the value. Essential for search inputs to prevent
- * excessive API requests.
- *
  * @param value - The value to debounce
  * @param delay - Delay in milliseconds (default: 300ms)
  * @returns The debounced value
- *
- * @example
- * ```tsx
- * const [searchQuery, setSearchQuery] = useState('');
- * const debouncedQuery = useDebounce(searchQuery, 300);
- *
- * useEffect(() => {
- *   if (debouncedQuery.length >= 2) {
- *     searchSchools(debouncedQuery);
- *   }
- * }, [debouncedQuery]);
- * ```
  */
 export function useDebounce<T>(value: T, delay: number = 300): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
-    // Set up a timer to update the debounced value after the delay
     const timer = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
 
-    // Clean up the timer if value changes before delay completes
     return () => {
       clearTimeout(timer);
     };
@@ -42,49 +24,81 @@ export function useDebounce<T>(value: T, delay: number = 300): T {
 }
 
 /**
- * useDebouncedCallback - Returns a debounced version of a callback function
+ * useDebouncedSearch - Debounced search with AbortController for race-condition safety
  *
- * Use this when you need to debounce a function call rather than a value.
+ * Combines debouncing with request cancellation: when the user types a new
+ * character, any in-flight request is aborted before the next one fires.
+ * This guarantees results always match the latest query.
  *
- * @param callback - The function to debounce
- * @param delay - Delay in milliseconds (default: 300ms)
- * @returns The debounced callback function
- *
- * @example
- * ```tsx
- * const debouncedSearch = useDebouncedCallback((query: string) => {
- *   searchSchools(query);
- * }, 300);
- *
- * <input onChange={(e) => debouncedSearch(e.target.value)} />
- * ```
+ * @param fetchFn - Async function that accepts (query, signal) and returns results
+ * @param delay - Debounce delay in ms (default: 300)
+ * @param minLength - Minimum query length to trigger search (default: 2)
  */
-export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
-  callback: T,
-  delay: number = 300
-): (...args: Parameters<T>) => void {
-  const [timeoutId, setTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
+export function useDebouncedSearch<T>(
+  fetchFn: (query: string, signal: AbortSignal) => Promise<T>,
+  delay: number = 300,
+  minLength: number = 2
+) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<T | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const debouncedQuery = useDebounce(query, delay);
 
   useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [timeoutId]);
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+    // Cancel any previous in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
 
-    const newTimeoutId = setTimeout(() => {
-      callback(...args);
-    }, delay);
+    if (debouncedQuery.length < minLength) {
+      setResults(null);
+      setIsLoading(false);
+      return;
+    }
 
-    setTimeoutId(newTimeoutId);
-  };
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    setIsLoading(true);
+
+    fetchFn(debouncedQuery, controller.signal)
+      .then((data) => {
+        // Only update if this request wasn't aborted
+        if (!controller.signal.aborted) {
+          setResults(data);
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError' && err.name !== 'CanceledError') {
+          console.error('Search failed:', err);
+          if (!controller.signal.aborted) {
+            setResults(null);
+          }
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedQuery, fetchFn, minLength]);
+
+  const reset = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    setQuery('');
+    setResults(null);
+    setIsLoading(false);
+  }, []);
+
+  return { query, setQuery, results, setResults, isLoading, reset };
 }
 
 export default useDebounce;

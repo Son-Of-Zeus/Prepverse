@@ -54,7 +54,8 @@ export interface SetSchoolResponse {
 export async function searchSchools(
   query: string,
   state?: string,
-  limit: number = 20
+  limit: number = 20,
+  signal?: AbortSignal
 ): Promise<SchoolSearchResponse> {
   const params = new URLSearchParams({
     q: query,
@@ -66,7 +67,8 @@ export async function searchSchools(
   }
 
   const response = await apiClient.get<SchoolSearchResponse>(
-    `/schools/search?${params}`
+    `/schools/search?${params}`,
+    { signal }
   );
   return response.data;
 }
