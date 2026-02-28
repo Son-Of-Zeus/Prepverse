@@ -12,6 +12,8 @@ import {
   Zap,
   LogOut,
   School,
+  MessageSquare,
+  GraduationCap,
 } from 'lucide-react';
 import { usePeer, usePeerDiscovery } from '../hooks/usePeer';
 import { SessionCard, PeerCard, CreateRoomModal } from '../components/peer';
@@ -29,6 +31,8 @@ const SideNav = () => {
   const navItems: Array<{ label: string; icon: typeof LayoutDashboard; path: string; disabled?: boolean }> = [
     { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Start Practice', icon: Target, path: '/practice' },
+    { label: 'Guru Mode', icon: GraduationCap, path: '/guru' },
+    { label: 'Discussion', icon: MessageSquare, path: '/discussion' },
     { label: 'Focus Mode', icon: Zap, path: '/focus' },
     { label: 'Peer Study', icon: Users, path: '/peer' },
   ];

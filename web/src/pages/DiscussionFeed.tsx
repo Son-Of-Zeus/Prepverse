@@ -6,7 +6,7 @@ import { Post } from '../types/forum';
 import { DiscussionCard } from '../components/discussion/DiscussionCard';
 import { AskQuestionModal } from '../components/discussion/AskQuestionModal';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Target, Zap, LogOut, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Target, Zap, LogOut, MessageSquare, GraduationCap, Users } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 // Use same side nav from Dashboard to avoid duplication or import it if exported
@@ -24,8 +24,10 @@ const SideNav = () => {
     const navItems = [
         { label: 'Home', icon: LayoutDashboard, path: '/dashboard' },
         { label: 'Start Practice', icon: Target, path: '/practice' },
+        { label: 'Guru Mode', icon: GraduationCap, path: '/guru' },
         { label: 'Discussion', icon: MessageSquare, path: '/discussion' },
         { label: 'Focus Mode', icon: Zap, path: '/focus' },
+        { label: 'Peer Study', icon: Users, path: '/peer' },
     ];
 
     return (
